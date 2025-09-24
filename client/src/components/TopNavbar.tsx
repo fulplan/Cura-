@@ -1,4 +1,4 @@
-import { Search, Bell, User, Settings, LogOut, Menu, X } from "lucide-react";
+import { Search, Bell, User, Settings, LogOut, PanelLeft, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,15 +11,21 @@ import {
 import { Badge } from "@/components/ui/badge";
 import MobileNavigation from "./MobileNavigation";
 import { ThemeToggle } from "./ThemeToggle";
+import { useSidebar } from "@/components/ui/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface TopNavbarProps {
   onSearch?: (query: string) => void;
   currentPage?: string;
-  onToggleSidebar?: () => void;
-  sidebarCollapsed?: boolean;
 }
 
-export default function TopNavbar({ onSearch, currentPage, onToggleSidebar, sidebarCollapsed }: TopNavbarProps) {
+export default function TopNavbar({ onSearch, currentPage }: TopNavbarProps) {
+  const { state, toggleSidebar, isMobile } = useSidebar();
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -34,16 +40,30 @@ export default function TopNavbar({ onSearch, currentPage, onToggleSidebar, side
         {/* Mobile Navigation */}
         <MobileNavigation currentPage={currentPage} />
         
-        {/* Desktop Sidebar Toggle */}
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="hidden lg:flex"
-          onClick={onToggleSidebar}
-          data-testid="button-sidebar-toggle"
-        >
-          {sidebarCollapsed ? <Menu className="w-5 h-5" /> : <X className="w-5 h-5" />}
-        </Button>
+        {/* Sidebar Toggle - Visible on all screen sizes */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="flex"
+                onClick={toggleSidebar}
+                aria-pressed={state === "expanded"}
+                data-testid="button-sidebar-toggle"
+              >
+                {state === "collapsed" ? 
+                  <PanelLeft className="w-5 h-5" /> : 
+                  <PanelLeftOpen className="w-5 h-5" />
+                }
+                <span className="sr-only">Toggle sidebar</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>{state === "collapsed" ? "Open sidebar" : "Close sidebar"}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         
         <div className="flex items-center gap-2 md:gap-3">
           <h1 className="type-subtitle font-bold text-foreground">
