@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetClose, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Menu, X } from "lucide-react";
 import { useLocation } from "wouter";
-import AdminSidebar from "./AdminSidebar";
+import SimpleMobileNav from "./SimpleMobileNav";
 
 interface MobileNavigationProps {
   currentPage?: string;
@@ -18,7 +16,7 @@ export default function MobileNavigation({ currentPage = "dashboard" }: MobileNa
   // Close mobile menu when route changes
   useEffect(() => {
     if (isOpen) {
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.log('📱 [MOBILE NAV] Route changed, closing mobile menu:', {
           newLocation: location,
           timestamp: new Date().toISOString()
@@ -30,7 +28,7 @@ export default function MobileNavigation({ currentPage = "dashboard" }: MobileNa
 
   // Debug logging for mobile menu state
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.log('📱 [MOBILE NAV] Menu state changed:', {
         isOpen,
         currentPage,
@@ -41,34 +39,42 @@ export default function MobileNavigation({ currentPage = "dashboard" }: MobileNa
   }, [isOpen, currentPage, location]);
 
   return (
-    <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <SheetTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="lg:hidden"
-          data-testid="button-mobile-menu"
+    <>
+      {/* Custom hamburger button with proper icon state */}
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        className="lg:hidden"
+        onClick={() => setIsOpen(!isOpen)}
+        aria-label={isOpen ? "Close menu" : "Open menu"}
+        data-testid="button-mobile-menu"
+      >
+        {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+      </Button>
+      
+      <Sheet open={isOpen} onOpenChange={setIsOpen}>
+        <SheetContent 
+          side="left" 
+          className="p-0 w-[min(20rem,90vw)] h-[100dvh] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+          data-testid="sheet-mobile-nav"
+          aria-describedby="mobile-nav-description"
         >
-          <Menu className="w-5 h-5" />
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="left" className="w-80 p-0">
-        <SheetHeader className="p-4 border-b">
-          <SheetTitle className="text-left font-bold text-foreground">
-            Penkora
-          </SheetTitle>
-        </SheetHeader>
-        <div className="overflow-y-auto h-full">
-          <SidebarProvider style={{
-            "--sidebar-width": "16rem",
-            "--sidebar-width-icon": "3rem",
-          } as React.CSSProperties}>
-            <AdminSidebar 
+          <SheetHeader className="p-4 border-b">
+            <SheetTitle className="text-left font-bold text-foreground">
+              Penkora
+            </SheetTitle>
+            <SheetDescription id="mobile-nav-description" className="sr-only">
+              Navigation menu for Penkora CMS with content management options
+            </SheetDescription>
+          </SheetHeader>
+          <div className="overflow-y-auto flex-1">
+            <SimpleMobileNav 
               activeItem={currentPage}
+              onNavigate={() => setIsOpen(false)}
             />
-          </SidebarProvider>
-        </div>
-      </SheetContent>
-    </Sheet>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }

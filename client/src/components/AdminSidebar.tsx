@@ -29,14 +29,15 @@ import { useEffect } from "react";
 interface AdminSidebarProps {
   activeItem?: string;
   collapsed?: boolean;
+  onNavigate?: () => void;
 }
 
-export default function AdminSidebar({ activeItem = "dashboard", collapsed = false }: AdminSidebarProps) {
+export default function AdminSidebar({ activeItem = "dashboard", collapsed = false, onNavigate }: AdminSidebarProps) {
   const [location] = useLocation();
 
   // Debug logging for sidebar navigation
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.log('📍 [SIDEBAR] Active item changed:', {
         activeItem,
         location,
@@ -153,7 +154,7 @@ export default function AdminSidebar({ activeItem = "dashboard", collapsed = fal
                 <Link 
                   href={item.url}
                   onClick={() => {
-                    if (process.env.NODE_ENV === 'development') {
+                    if (import.meta.env.DEV) {
                       console.log('🔗 [SIDEBAR] Navigation clicked:', {
                         from: location,
                         to: item.url,
@@ -161,6 +162,8 @@ export default function AdminSidebar({ activeItem = "dashboard", collapsed = fal
                         timestamp: new Date().toISOString()
                       });
                     }
+                    // Close mobile menu when navigating
+                    onNavigate?.();
                   }}
                 >
                   <item.icon className="w-4 h-4" />

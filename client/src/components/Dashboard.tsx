@@ -19,10 +19,10 @@ interface DashboardProps {
 export default function Dashboard({ onQuickAction }: DashboardProps) {
   // TODO: Remove mock data
   const stats = [
-    { title: "Total Posts", value: "124", change: "+12%", icon: FileText, color: "text-blue-500" },
-    { title: "Active Users", value: "48", change: "+8%", icon: Users, color: "text-green-500" },
-    { title: "Page Views", value: "15.2k", change: "+23%", icon: Eye, color: "text-purple-500" },
-    { title: "Monthly Growth", value: "18%", change: "+5%", icon: TrendingUp, color: "text-orange-500" },
+    { title: "Total Posts", value: "124", change: "+12%", icon: FileText, color: "text-primary" },
+    { title: "Active Users", value: "48", change: "+8%", icon: Users, color: "text-primary" },
+    { title: "Page Views", value: "15.2k", change: "+23%", icon: Eye, color: "text-primary" },
+    { title: "Monthly Growth", value: "18%", change: "+5%", icon: TrendingUp, color: "text-primary" },
   ];
 
   const recentPosts = [
@@ -40,31 +40,31 @@ export default function Dashboard({ onQuickAction }: DashboardProps) {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "published": return "bg-green-500";
-      case "draft": return "bg-yellow-500";
-      case "scheduled": return "bg-blue-500";
-      default: return "bg-gray-500";
+      case "published": return "bg-green-500 text-white";
+      case "draft": return "bg-yellow-500 text-white";
+      case "scheduled": return "bg-blue-500 text-white";
+      default: return "bg-muted text-muted-foreground";
     }
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+    <div className="py-4 md:py-6 space-y-4 md:space-y-6">
       {/* Welcome Section */}
       <div>
-        <h1 className="text-2xl md:text-3xl font-semibold mb-2" data-testid="text-dashboard-title">Welcome back!</h1>
-        <p className="text-muted-foreground text-sm md:text-base">Here's what's happening with your content today.</p>
+        <h1 className="type-title mb-2" data-testid="text-dashboard-title">Welcome back!</h1>
+        <p className="type-body text-muted-foreground">Here's what's happening with your content today.</p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
         {stats.map((stat, index) => (
           <Card key={index} data-testid={`card-stat-${stat.title.toLowerCase().replace(' ', '-')}`}>
-            <CardContent className="p-3 md:p-6">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs md:text-sm text-muted-foreground">{stat.title}</p>
-                  <p className="text-lg md:text-2xl font-bold">{stat.value}</p>
-                  <p className="text-xs text-green-500">{stat.change}</p>
+                  <p className="type-caption">{stat.title}</p>
+                  <p className="text-lg md:text-2xl font-bold num">{stat.value}</p>
+                  <p className="text-xs text-green-500 num">{stat.change}</p>
                 </div>
                 <stat.icon className={`w-6 h-6 md:w-8 md:h-8 ${stat.color}`} />
               </div>
@@ -83,9 +83,9 @@ export default function Dashboard({ onQuickAction }: DashboardProps) {
           <CardContent>
             <div className="space-y-4">
               {recentPosts.map((post, index) => (
-                <div key={index} className="flex items-center justify-between p-2 md:p-3 rounded hover-elevate" data-testid={`post-item-${index}`}>
+                <div key={index} className="flex items-center justify-between p-2 md:p-3 rounded interactive-slow hover:bg-accent focus-ring mobile-touch-target" data-testid={`post-item-${index}`}>
                   <div className="flex-1">
-                    <h4 className="font-medium">{post.title}</h4>
+                    <h4 className="type-body font-medium">{post.title}</h4>
                     <div className="flex items-center gap-2 mt-1">
                       <Badge variant="secondary" className={`w-2 h-2 p-0 rounded-full ${getStatusColor(post.status)}`} />
                       <span className="text-xs text-muted-foreground capitalize">{post.status}</span>
@@ -94,8 +94,8 @@ export default function Dashboard({ onQuickAction }: DashboardProps) {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-medium">{post.views}</p>
-                    <p className="text-xs text-muted-foreground">views</p>
+                    <p className="text-sm font-medium num">{post.views}</p>
+                    <p className="type-caption">views</p>
                   </div>
                 </div>
               ))}
@@ -115,7 +115,7 @@ export default function Dashboard({ onQuickAction }: DashboardProps) {
                 <Button
                   key={index}
                   variant="outline"
-                  className="justify-start h-auto p-3 md:p-4 text-left"
+                  className="justify-start h-auto p-4 md:p-6 text-left interactive focus-ring mobile-touch-target"
                   onClick={() => {
                     onQuickAction?.(action.action);
                     console.log(`Quick action: ${action.action}`);

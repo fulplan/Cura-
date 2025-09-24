@@ -17,14 +17,16 @@ export default function AdminLayout({ children, currentPage = "dashboard" }: Adm
   } as React.CSSProperties;
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen w-full">
+    <div className="flex flex-col lg:flex-row mobile-full-height w-full">
       {/* Desktop Sidebar - Hidden on mobile */}
       <div className={`hidden lg:block transition-all duration-200 ${sidebarCollapsed ? 'w-12' : 'w-64'}`}>
         <SidebarProvider style={style}>
-          <AdminSidebar 
-            activeItem={currentPage}
-            collapsed={sidebarCollapsed}
-          />
+          <div className="w-full">
+            <AdminSidebar 
+              activeItem={currentPage}
+              collapsed={sidebarCollapsed}
+            />
+          </div>
         </SidebarProvider>
       </div>
       
@@ -38,7 +40,9 @@ export default function AdminLayout({ children, currentPage = "dashboard" }: Adm
         />
         
         <main className="flex-1 overflow-auto bg-background">
-          {children}
+          <div className="max-w-7xl mx-auto px-4 md:px-6">
+            {children}
+          </div>
         </main>
       </div>
     </div>
