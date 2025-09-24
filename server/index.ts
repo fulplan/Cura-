@@ -6,10 +6,19 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Enhanced development logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
+
+  // Log incoming requests in development
+  if (app.get("env") === "development" && path.startsWith("/api")) {
+    log(`🌐 [REQUEST] ${req.method} ${path} - ${req.ip}`);
+    if (req.body && Object.keys(req.body).length > 0) {
+      log(`📦 [REQUEST BODY] ${JSON.stringify(req.body, null, 2)}`);
+    }
+  }
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
@@ -30,6 +39,15 @@ app.use((req, res, next) => {
       }
 
       log(logLine);
+      
+      // Enhanced development response logging
+      if (app.get("env") === "development") {
+        const status = res.statusCode >= 400 ? '❌' : res.statusCode >= 300 ? '⚠️' : '✅';
+        log(`${status} [RESPONSE] ${req.method} ${path} - ${res.statusCode} (${duration}ms)`);
+        if (capturedJsonResponse && res.statusCode >= 400) {
+          log(`🚨 [ERROR RESPONSE] ${JSON.stringify(capturedJsonResponse, null, 2)}`);
+        }
+      }
     }
   });
 

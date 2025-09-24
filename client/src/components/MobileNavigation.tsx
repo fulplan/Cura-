@@ -1,22 +1,44 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Menu, X } from "lucide-react";
+import { useLocation } from "wouter";
 import AdminSidebar from "./AdminSidebar";
 
 interface MobileNavigationProps {
   currentPage?: string;
-  onNavigate?: (page: string) => void;
 }
 
-export default function MobileNavigation({ currentPage = "dashboard", onNavigate }: MobileNavigationProps) {
+export default function MobileNavigation({ currentPage = "dashboard" }: MobileNavigationProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [location] = useLocation();
 
-  const handleNavigate = (page: string) => {
-    onNavigate?.(page);
-    setIsOpen(false); // Close mobile menu after navigation
-  };
+  // Close mobile menu when route changes
+  useEffect(() => {
+    if (isOpen) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📱 [MOBILE NAV] Route changed, closing mobile menu:', {
+          newLocation: location,
+          timestamp: new Date().toISOString()
+        });
+      }
+      setIsOpen(false);
+    }
+  }, [location]); // Removed isOpen from dependencies to prevent immediate closing
+
+  // Debug logging for mobile menu state
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📱 [MOBILE NAV] Menu state changed:', {
+        isOpen,
+        currentPage,
+        location,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [isOpen, currentPage, location]);
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -37,10 +59,14 @@ export default function MobileNavigation({ currentPage = "dashboard", onNavigate
           </SheetTitle>
         </SheetHeader>
         <div className="overflow-y-auto h-full">
-          <AdminSidebar 
-            activeItem={currentPage}
-            onItemClick={handleNavigate}
-          />
+          <SidebarProvider style={{
+            "--sidebar-width": "16rem",
+            "--sidebar-width-icon": "3rem",
+          } as React.CSSProperties}>
+            <AdminSidebar 
+              activeItem={currentPage}
+            />
+          </SidebarProvider>
         </div>
       </SheetContent>
     </Sheet>

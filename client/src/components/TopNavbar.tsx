@@ -1,4 +1,4 @@
-import { Search, Bell, User, Settings, LogOut } from "lucide-react";
+import { Search, Bell, User, Settings, LogOut, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,10 +14,11 @@ import MobileNavigation from "./MobileNavigation";
 interface TopNavbarProps {
   onSearch?: (query: string) => void;
   currentPage?: string;
-  onNavigate?: (page: string) => void;
+  onToggleSidebar?: () => void;
+  sidebarCollapsed?: boolean;
 }
 
-export default function TopNavbar({ onSearch, currentPage, onNavigate }: TopNavbarProps) {
+export default function TopNavbar({ onSearch, currentPage, onToggleSidebar, sidebarCollapsed }: TopNavbarProps) {
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -29,7 +30,19 @@ export default function TopNavbar({ onSearch, currentPage, onNavigate }: TopNavb
   return (
     <header className="flex items-center justify-between p-3 md:p-4 border-b bg-card">
       <div className="flex items-center gap-3 md:gap-6 flex-1">
-        <MobileNavigation currentPage={currentPage} onNavigate={onNavigate} />
+        {/* Mobile Navigation */}
+        <MobileNavigation currentPage={currentPage} />
+        
+        {/* Desktop Sidebar Toggle */}
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="hidden lg:flex"
+          onClick={onToggleSidebar}
+          data-testid="button-sidebar-toggle"
+        >
+          {sidebarCollapsed ? <Menu className="w-5 h-5" /> : <X className="w-5 h-5" />}
+        </Button>
         
         <div className="flex items-center gap-2 md:gap-3">
           <h1 className="text-lg md:text-xl font-bold text-foreground">
