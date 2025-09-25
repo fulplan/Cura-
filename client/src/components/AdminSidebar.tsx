@@ -25,15 +25,16 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "wouter";
 import { useEffect } from "react";
+import { useSidebar } from "@/components/ui/sidebar";
 
 interface AdminSidebarProps {
   activeItem?: string;
-  collapsed?: boolean;
   onNavigate?: () => void;
 }
 
-export default function AdminSidebar({ activeItem = "dashboard", collapsed = false, onNavigate }: AdminSidebarProps) {
+export default function AdminSidebar({ activeItem = "dashboard", onNavigate }: AdminSidebarProps) {
   const [location] = useLocation();
+  const { state } = useSidebar();
 
   // Debug logging for sidebar navigation
   useEffect(() => {
@@ -167,7 +168,7 @@ export default function AdminSidebar({ activeItem = "dashboard", collapsed = fal
                   }}
                 >
                   <item.icon className="w-4 h-4" />
-                  {!collapsed && (
+                  {state === "expanded" && (
                     <>
                       <span>{item.title}</span>
                       {item.badge && (
