@@ -77,27 +77,36 @@ export default function NewPostPage({
   const [previewData, setPreviewData] = useState<any>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  // Memoized update function to prevent unnecessary re-renders
+  // Optimized update function to prevent unnecessary re-renders
   const updateField = useCallback((field: string, value: any) => {
     setFormData((prev: any) => {
       // Only update if the value actually changed
       if (prev[field] === value) return prev;
       return { ...prev, [field]: value };
     });
-    setIsDirty(true);
+    // Set dirty state in a separate effect to prevent re-render cascade
+    setTimeout(() => setIsDirty(true), 0);
   }, []);
 
-  // Memoized tag functions to prevent re-renders
+  // Stable tag functions to prevent re-renders
   const addTag = useCallback(() => {
-    if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
-      updateField("tags", [...formData.tags, newTag.trim()]);
+    if (newTag.trim()) {
+      setFormData((prev: any) => {
+        if (prev.tags.includes(newTag.trim())) return prev;
+        return { ...prev, tags: [...prev.tags, newTag.trim()] };
+      });
       setNewTag("");
+      setTimeout(() => setIsDirty(true), 0);
     }
-  }, [newTag, formData.tags, updateField]);
+  }, [newTag]);
 
   const removeTag = useCallback((tagToRemove: string) => {
-    updateField("tags", formData.tags.filter((tag: string) => tag !== tagToRemove));
-  }, [formData.tags, updateField]);
+    setFormData((prev: any) => ({
+      ...prev,
+      tags: prev.tags.filter((tag: string) => tag !== tagToRemove)
+    }));
+    setTimeout(() => setIsDirty(true), 0);
+  }, []);
 
   const handleSave = async () => {
     try {
@@ -209,7 +218,7 @@ export default function NewPostPage({
     onPreview(formData);
   }, [formData, onPreview]);
 
-  const ContentTab = () => (
+  const ContentTab = useCallback(() => (
     <div className="space-y-6">
       <div className="space-y-2">
         <Label htmlFor="title">Title *</Label>
@@ -263,9 +272,9 @@ export default function NewPostPage({
         </Button>
       </div>
     </div>
-  );
+  ), [formData.title, formData.content, formData.excerpt, updateField, handlePreview]);
 
-  const MetaTab = () => (
+  const MetaTab = useCallback(() => (
     <div className="space-y-6">
       <div className="space-y-4">
         <div className="space-y-2">
@@ -364,9 +373,9 @@ export default function NewPostPage({
         </div>
       </div>
     </div>
-  );
+  ), [formData.category, formData.tags, formData.publishDate, formData.featured, formData.allowComments, newTag, updateField, addTag, removeTag]);
 
-  const SeoTab = () => (
+  const SeoTab = useCallback(() => (
     <div className="space-y-6">
       <div className="space-y-2">
         <Label htmlFor="seoTitle">SEO Title</Label>
@@ -414,7 +423,7 @@ export default function NewPostPage({
         </CardContent>
       </Card>
     </div>
-  );
+  ), [formData.seoTitle, formData.seoDescription, formData.title, formData.excerpt, updateField]);
 
   return (
     <Page data-testid="new-post-page">
