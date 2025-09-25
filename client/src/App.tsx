@@ -19,6 +19,7 @@ import UsersManager from "@/components/UsersManager";
 import NotFound from "@/pages/not-found";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import HeroBuilderPage from "@/components/HeroBuilderPage";
+import WidgetsManagerPage from "@/components/WidgetsManagerPage";
 
 function Router() {
   const [location] = useLocation();
@@ -128,12 +129,10 @@ function Router() {
       
       <Route path="/layout/widgets">
         <AdminLayout currentPage={getCurrentPage()}>
-          <div className="p-6">
-            <h1 className="text-3xl font-semibold mb-2">Widgets & Sidebars</h1>
-            <p className="text-muted-foreground">
-              Widget management coming soon.
-            </p>
-          </div>
+          <WidgetsManagerPage 
+            onSave={(data) => console.log("Save widgets:", data)}
+            onPreview={(data) => console.log("Preview widgets:", data)}
+          />
         </AdminLayout>
       </Route>
       
