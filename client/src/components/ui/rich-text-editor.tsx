@@ -64,6 +64,8 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
     const editor = useEditor({
       extensions: [
         StarterKit.configure({
+          // Disable the built-in Link extension to avoid conflicts
+          link: false,
           bulletList: {
             keepMarks: true,
             keepAttributes: false,
