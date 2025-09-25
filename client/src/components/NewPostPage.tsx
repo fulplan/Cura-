@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { ArrowLeft, Save, Eye, MoreHorizontal, ImagePlus, Tag, Settings, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
   PageActions,
   ActionBar
 } from "@/components/ui/page";
+import { RichTextEditor, type RichTextEditorRef } from "@/components/ui/rich-text-editor";
 
 interface NewPostPageProps {
   onSave?: (data: any) => void;
@@ -35,6 +36,7 @@ export default function NewPostPage({
 }: NewPostPageProps) {
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("content");
+  const editorRef = useRef<RichTextEditorRef>(null);
   const [formData, setFormData] = useState({
     title: "",
     content: "",
@@ -98,16 +100,15 @@ export default function NewPostPage({
 
       <div className="space-y-2">
         <Label htmlFor="content">Content *</Label>
-        <Textarea
-          id="content"
+        <RichTextEditor
+          ref={editorRef}
+          content={formData.content}
           placeholder="Write your post content here..."
-          value={formData.content}
-          onChange={(e) => updateField("content", e.target.value)}
-          className="min-h-[300px] md:min-h-[400px]"
-          data-testid="post-content"
+          onChange={(content) => updateField("content", content)}
+          editorClassName="min-h-[300px] md:min-h-[400px]"
         />
         <p className="text-xs text-muted-foreground">
-          {formData.content.length} characters
+          {editorRef.current?.getText().length || 0} characters
         </p>
       </div>
 
