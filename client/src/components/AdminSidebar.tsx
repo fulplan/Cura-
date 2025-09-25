@@ -40,7 +40,7 @@ export default function AdminSidebar({ activeItem = "dashboard", onNavigate }: A
 
   // Debug logging for sidebar navigation
   useEffect(() => {
-    if (import.meta.env.DEV) {
+    if (process.env.NODE_ENV === 'development') {
       console.log('📍 [SIDEBAR] Active item changed:', {
         activeItem,
         location,
@@ -160,7 +160,7 @@ export default function AdminSidebar({ activeItem = "dashboard", onNavigate }: A
                 <Link 
                   href={item.url}
                   onClick={() => {
-                    if (import.meta.env.DEV) {
+                    if (process.env.NODE_ENV === 'development') {
                       console.log('🔗 [SIDEBAR] Navigation clicked:', {
                         from: location,
                         to: item.url,
