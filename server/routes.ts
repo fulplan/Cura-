@@ -16,6 +16,7 @@ import multer from "multer";
 import { join } from "path";
 import { mkdirSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
+import bcrypt from "bcryptjs";
 
 // Helper function for error responses with proper status codes
 const sendError = (res: any, status: number, message: string) => {
@@ -240,6 +241,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return sendError(res, 401, "Not authenticated");
     }
     res.json({ user: req.session.user });
+  });
+
+  app.put("/api/auth/profile", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.session.user.id;
+      const { displayName, email, currentPassword, newPassword } = req.body;
+
+      if (!displayName || !email) {
+        return sendError(res, 400, "Display name and email are required");
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return sendError(res, 400, "Invalid email format");
+      }
+
+      // If updating password, verify current password
+      if (newPassword) {
+        if (!currentPassword) {
+          return sendError(res, 400, "Current password is required to change password");
+        }
+
+        const user = await storage.getUser(userId);
+        if (!user) {
+          return sendError(res, 404, "User not found");
+        }
+
+        const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+        if (!isValidPassword) {
+          return sendError(res, 400, "Current password is incorrect");
+        }
+
+        if (newPassword.length < 8) {
+          return sendError(res, 400, "New password must be at least 8 characters long");
+        }
+      }
+
+      // Prepare update data
+      const updateData: any = {
+        displayName,
+        email
+      };
+
+      // Hash new password if provided
+      if (newPassword) {
+        updateData.password = await bcrypt.hash(newPassword, 12);
+      }
+
+      const updatedUser = await storage.updateUser(userId, updateData);
+      if (!updatedUser) {
+        return sendError(res, 404, "User not found");
+      }
+
+      // Update session with new user data
+      req.session.user = {
+        id: updatedUser.id,
+        username: updatedUser.username,
+        role: updatedUser.role,
+        displayName: updatedUser.displayName
+      };
+
+      // Return user without password
+      const { password: _, ...safeUser } = updatedUser;
+      res.json({ user: safeUser, message: "Profile updated successfully" });
+
+    } catch (error) {
+      console.error("Profile update error:", error);
+      sendError(res, 500, "Failed to update profile");
+    }
   });
 
   // Dashboard & Analytics Routes

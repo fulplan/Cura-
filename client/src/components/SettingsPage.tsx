@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
-import { Save, Globe, Shield, Bell, Database, Palette, Users, Mail, CheckCircle, AlertCircle, Info, Loader2 } from "lucide-react";
+import { Save, Globe, Shield, Bell, Database, Palette, Users, Mail, CheckCircle, AlertCircle, Info, Loader2, UserCircle, Eye, EyeOff } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,11 +34,23 @@ export default function SettingsPage({
     console.log("Save settings (sensitive fields redacted):", safeSettings);
   }
 }: SettingsPageProps) {
-  const [activeTab, setActiveTab] = useState("general");
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("profile");
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [profileSettings, setProfileSettings] = useState({
+    displayName: user?.displayName || "",
+    email: user?.email || "",
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
   const [settings, setSettings] = useState({
     // General
     siteName: "Penkora CMS",
@@ -92,6 +107,20 @@ export default function SettingsPage({
     }
   };
 
+  const updateProfileSetting = (key: string, value: any) => {
+    setProfileSettings(prev => ({ ...prev, [key]: value }));
+    setIsDirty(true);
+    setSaveSuccess(false);
+    
+    // Clear validation error for this field
+    if (validationErrors[key]) {
+      setValidationErrors(prev => {
+        const { [key]: removed, ...rest } = prev;
+        return rest;
+      });
+    }
+  };
+
   const validateSettings = () => {
     const errors: Record<string, string> = {};
     
@@ -118,7 +147,49 @@ export default function SettingsPage({
     return errors;
   };
 
+  const validateProfile = () => {
+    const errors: Record<string, string> = {};
+    
+    if (!profileSettings.displayName.trim()) {
+      errors.displayName = "Display name is required";
+    }
+    
+    if (!profileSettings.email.trim()) {
+      errors.email = "Email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileSettings.email)) {
+      errors.email = "Please enter a valid email address";
+    }
+    
+    // Password validation only if user is trying to change password
+    if (profileSettings.newPassword || profileSettings.currentPassword || profileSettings.confirmPassword) {
+      if (!profileSettings.currentPassword) {
+        errors.currentPassword = "Current password is required to change password";
+      }
+      
+      if (!profileSettings.newPassword) {
+        errors.newPassword = "New password is required";
+      } else if (profileSettings.newPassword.length < 8) {
+        errors.newPassword = "Password must be at least 8 characters long";
+      }
+      
+      if (profileSettings.newPassword !== profileSettings.confirmPassword) {
+        errors.confirmPassword = "Passwords do not match";
+      }
+    }
+    
+    return errors;
+  };
+
   const handleSave = async () => {
+    // Call appropriate save function based on active tab
+    if (activeTab === "profile") {
+      await handleProfileSave();
+    } else {
+      await handleSiteSettingsSave();
+    }
+  };
+
+  const handleSiteSettingsSave = async () => {
     const errors = validateSettings();
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
@@ -136,10 +207,73 @@ export default function SettingsPage({
       setSaveSuccess(true);
       setValidationErrors({});
       
+      toast({
+        title: "Settings saved",
+        description: "Your site settings have been updated successfully.",
+      });
+      
       // Auto-hide success message after 3 seconds
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (error) {
       console.error("Failed to save settings:", error);
+      toast({
+        title: "Save failed",
+        description: "There was an error saving your settings. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleProfileSave = async () => {
+    const errors = validateProfile();
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      const updateData: any = {
+        displayName: profileSettings.displayName,
+        email: profileSettings.email
+      };
+      
+      // Only include password fields if user is changing password
+      if (profileSettings.newPassword) {
+        updateData.currentPassword = profileSettings.currentPassword;
+        updateData.newPassword = profileSettings.newPassword;
+      }
+      
+      await apiRequest('PUT', '/api/auth/profile', updateData);
+      
+      // Clear password fields after successful update
+      setProfileSettings(prev => ({
+        ...prev,
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      }));
+      
+      setIsDirty(false);
+      setSaveSuccess(true);
+      setValidationErrors({});
+      
+      toast({
+        title: "Profile updated",
+        description: "Your profile has been updated successfully.",
+      });
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+      toast({
+        title: "Update failed",
+        description: "There was an error updating your profile. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSaving(false);
     }
@@ -159,6 +293,201 @@ export default function SettingsPage({
     
     return () => clearTimeout(autoSaveTimer);
   }, [settings, isDirty]);
+
+  const ProfileTab = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <UserCircle className="h-4 w-4" />
+            User Profile
+          </CardTitle>
+          <CardDescription>
+            Update your personal information and account settings
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="displayName" className={validationErrors.displayName ? "text-destructive" : ""}>
+                Display Name
+                <span className="text-destructive ml-1">*</span>
+              </Label>
+              <Input
+                id="displayName"
+                value={profileSettings.displayName}
+                onChange={(e) => updateProfileSetting("displayName", e.target.value)}
+                placeholder="Your display name"
+                className={validationErrors.displayName ? "border-destructive focus:border-destructive" : ""}
+                data-testid="input-display-name"
+              />
+              {validationErrors.displayName && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {validationErrors.displayName}
+                </p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="email" className={validationErrors.email ? "text-destructive" : ""}>
+                Email Address
+                <span className="text-destructive ml-1">*</span>
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={profileSettings.email}
+                onChange={(e) => updateProfileSetting("email", e.target.value)}
+                placeholder="your.email@example.com"
+                className={validationErrors.email ? "border-destructive focus:border-destructive" : ""}
+                data-testid="input-email"
+              />
+              {validationErrors.email && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {validationErrors.email}
+                </p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            Change Password
+          </CardTitle>
+          <CardDescription>
+            Update your password to keep your account secure
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="currentPassword" className={validationErrors.currentPassword ? "text-destructive" : ""}>
+              Current Password
+            </Label>
+            <div className="relative">
+              <Input
+                id="currentPassword"
+                type={showCurrentPassword ? "text" : "password"}
+                value={profileSettings.currentPassword}
+                onChange={(e) => updateProfileSetting("currentPassword", e.target.value)}
+                placeholder="Enter current password"
+                className={validationErrors.currentPassword ? "border-destructive focus:border-destructive pr-10" : "pr-10"}
+                data-testid="input-current-password"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                data-testid="button-toggle-current-password"
+              >
+                {showCurrentPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            {validationErrors.currentPassword && (
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                {validationErrors.currentPassword}
+              </p>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="newPassword" className={validationErrors.newPassword ? "text-destructive" : ""}>
+                New Password
+              </Label>
+              <div className="relative">
+                <Input
+                  id="newPassword"
+                  type={showNewPassword ? "text" : "password"}
+                  value={profileSettings.newPassword}
+                  onChange={(e) => updateProfileSetting("newPassword", e.target.value)}
+                  placeholder="Enter new password"
+                  className={validationErrors.newPassword ? "border-destructive focus:border-destructive pr-10" : "pr-10"}
+                  data-testid="input-new-password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  data-testid="button-toggle-new-password"
+                >
+                  {showNewPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              {validationErrors.newPassword && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {validationErrors.newPassword}
+                </p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword" className={validationErrors.confirmPassword ? "text-destructive" : ""}>
+                Confirm New Password
+              </Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={profileSettings.confirmPassword}
+                  onChange={(e) => updateProfileSetting("confirmPassword", e.target.value)}
+                  placeholder="Confirm new password"
+                  className={validationErrors.confirmPassword ? "border-destructive focus:border-destructive pr-10" : "pr-10"}
+                  data-testid="input-confirm-password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  data-testid="button-toggle-confirm-password"
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              {validationErrors.confirmPassword && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {validationErrors.confirmPassword}
+                </p>
+              )}
+            </div>
+          </div>
+          
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Leave password fields empty if you don't want to change your password.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    </div>
+  );
 
   const GeneralTab = () => (
     <div className="space-y-6">
@@ -582,13 +911,20 @@ export default function SettingsPage({
         <div className="md:hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="profile">Profile</TabsTrigger>
               <TabsTrigger value="general">General</TabsTrigger>
-              <TabsTrigger value="security">Security</TabsTrigger>
             </TabsList>
             <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="security">Security</TabsTrigger>
               <TabsTrigger value="notifications">Notifications</TabsTrigger>
+            </TabsList>
+            <TabsList className="grid w-full grid-cols-1">
               <TabsTrigger value="email">Email</TabsTrigger>
             </TabsList>
+            
+            <TabsContent value="profile">
+              <ProfileTab />
+            </TabsContent>
             
             <TabsContent value="general">
               <GeneralTab />
@@ -612,6 +948,10 @@ export default function SettingsPage({
         <div className="hidden md:block">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="w-full max-w-md">
+              <TabsTrigger value="profile" className="flex items-center gap-2">
+                <UserCircle className="h-4 w-4" />
+                Profile
+              </TabsTrigger>
               <TabsTrigger value="general" className="flex items-center gap-2">
                 <Globe className="h-4 w-4" />
                 General
@@ -629,6 +969,10 @@ export default function SettingsPage({
                 Email
               </TabsTrigger>
             </TabsList>
+            
+            <TabsContent value="profile">
+              <ProfileTab />
+            </TabsContent>
             
             <TabsContent value="general">
               <GeneralTab />

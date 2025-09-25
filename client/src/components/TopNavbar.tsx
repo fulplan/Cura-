@@ -17,6 +17,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAuth } from "@/hooks/useAuth";
+import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 interface TopNavbarProps {
   onSearch?: (query: string) => void;
@@ -25,12 +28,37 @@ interface TopNavbarProps {
 
 export default function TopNavbar({ onSearch, currentPage }: TopNavbarProps) {
   const { state, toggleSidebar, isMobile, openMobile } = useSidebar();
+  const { user, logout, isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const query = formData.get("search") as string;
     onSearch?.(query);
     console.log("Search triggered:", query);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast({
+        title: "Logged out successfully",
+        description: "You have been signed out of your account.",
+      });
+      setLocation("/login");
+    } catch (error) {
+      toast({
+        title: "Logout failed",
+        description: "There was an error signing you out. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSettings = () => {
+    setLocation("/settings");
   };
 
   return (
@@ -145,12 +173,12 @@ export default function TopNavbar({ onSearch, currentPage }: TopNavbarProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem data-testid="menu-item-settings">
+            <DropdownMenuItem onClick={handleSettings} data-testid="menu-item-settings">
               <Settings className="w-4 h-4 mr-2" />
               Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem data-testid="menu-item-logout">
+            <DropdownMenuItem onClick={handleLogout} data-testid="menu-item-logout">
               <LogOut className="w-4 h-4 mr-2" />
               Logout
             </DropdownMenuItem>
