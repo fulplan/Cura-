@@ -9,5 +9,5 @@ if (!process.env.DATABASE_URL) {
 }
 
 // Use HTTP driver for better compatibility in Replit environment
-const sql = neon(process.env.DATABASE_URL, { fetchConnectionCache: true });
+const sql = neon(process.env.DATABASE_URL);
 export const db = drizzle(sql, { schema });
