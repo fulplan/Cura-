@@ -1,15 +1,18 @@
 import { useParams } from "wouter";
-import React from "react";
+import React, { useState } from "react";
 import { usePost, useUpdatePost } from "@/hooks/usePosts";
 import { useToast } from "@/hooks/use-toast";
 import NewPostPage from "./NewPostPage";
 import { LoadingCard } from "@/components/ui/loading";
+import { PostPreviewModal } from "./PostPreviewModal";
 
 export default function EditPostPage() {
   const { id } = useParams<{ id: string }>();
   const { data: post, isLoading, error } = usePost(id || "");
   const updateMutation = useUpdatePost();
   const { toast } = useToast();
+  const [previewData, setPreviewData] = useState<any>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // Handle form save (update)
   const handleSave = async (formData: any) => {
@@ -56,11 +59,8 @@ export default function EditPostPage() {
 
   // Handle preview
   const handlePreview = (formData: any) => {
-    console.log("Preview post:", formData);
-    toast({
-      title: "Preview mode",
-      description: "Preview functionality will be implemented soon.",
-    });
+    setPreviewData(formData);
+    setIsPreviewOpen(true);
   };
 
   // Show loading state
@@ -116,13 +116,22 @@ export default function EditPostPage() {
   } : undefined;
 
   return (
-    <NewPostPage
-      mode="edit"
-      initialData={initialFormData}
-      onSave={handleSave}
-      onPublish={handlePublish}
-      onPreview={handlePreview}
-      isLoading={updateMutation.isPending}
-    />
+    <>
+      <NewPostPage
+        mode="edit"
+        initialData={initialFormData}
+        onSave={handleSave}
+        onPublish={handlePublish}
+        onPreview={handlePreview}
+        isLoading={updateMutation.isPending}
+      />
+      {previewData && (
+        <PostPreviewModal
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          postData={previewData}
+        />
+      )}
+    </>
   );
 }

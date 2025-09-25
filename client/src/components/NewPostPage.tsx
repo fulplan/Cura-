@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import { ArrowLeft, Save, Eye, MoreHorizontal, ImagePlus, Tag, Settings, Globe } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
@@ -25,6 +25,7 @@ import {
   ActionBar
 } from "@/components/ui/page";
 import { RichTextEditor, type RichTextEditorRef } from "@/components/ui/rich-text-editor";
+import { PostPreviewModal } from "./PostPreviewModal";
 
 interface NewPostPageProps {
   mode?: 'create' | 'edit';
@@ -73,22 +74,30 @@ export default function NewPostPage({
 
   const [newTag, setNewTag] = useState("");
   const [isDirty, setIsDirty] = useState(false);
+  const [previewData, setPreviewData] = useState<any>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  const updateField = (field: string, value: any) => {
-    setFormData((prev: any) => ({ ...prev, [field]: value }));
+  // Memoized update function to prevent unnecessary re-renders
+  const updateField = useCallback((field: string, value: any) => {
+    setFormData((prev: any) => {
+      // Only update if the value actually changed
+      if (prev[field] === value) return prev;
+      return { ...prev, [field]: value };
+    });
     setIsDirty(true);
-  };
+  }, []);
 
-  const addTag = () => {
+  // Memoized tag functions to prevent re-renders
+  const addTag = useCallback(() => {
     if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
       updateField("tags", [...formData.tags, newTag.trim()]);
       setNewTag("");
     }
-  };
+  }, [newTag, formData.tags, updateField]);
 
-  const removeTag = (tagToRemove: string) => {
+  const removeTag = useCallback((tagToRemove: string) => {
     updateField("tags", formData.tags.filter((tag: string) => tag !== tagToRemove));
-  };
+  }, [formData.tags, updateField]);
 
   const handleSave = async () => {
     try {
@@ -194,9 +203,11 @@ export default function NewPostPage({
     }
   };
 
-  const handlePreview = () => {
+  const handlePreview = useCallback(() => {
+    setPreviewData(formData);
+    setIsPreviewOpen(true);
     onPreview(formData);
-  };
+  }, [formData, onPreview]);
 
   const ContentTab = () => (
     <div className="space-y-6">
@@ -570,6 +581,15 @@ export default function NewPostPage({
           <Eye className="h-4 w-4" />
         </Button>
       </ActionBar>
+      
+      {/* Preview Modal */}
+      {previewData && (
+        <PostPreviewModal
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          postData={previewData}
+        />
+      )}
     </Page>
   );
 }
