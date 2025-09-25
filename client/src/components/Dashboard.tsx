@@ -64,7 +64,7 @@ export default function Dashboard({ onQuickAction }: DashboardProps) {
                 <div>
                   <p className="type-overline">{stat.title}</p>
                   <p className="type-heading num">{stat.value}</p>
-                  <p className="type-caption text-success num">{stat.change}</p>
+                  <p className={`type-caption num ${stat.change.startsWith('+') ? 'text-success' : 'text-destructive'}`}>{stat.change}</p>
                 </div>
                 <div className="rounded-lg bg-primary/10 p-2">
                   <stat.icon className="w-5 h-5 md:w-6 md:h-6 text-primary" />
@@ -85,7 +85,7 @@ export default function Dashboard({ onQuickAction }: DashboardProps) {
           <CardContent>
             <div className="space-y-4">
               {recentPosts.map((post, index) => (
-                <div key={index} className="flex items-center justify-between p-2 md:p-3 rounded interactive-slow hover:bg-accent focus-ring mobile-touch-target" data-testid={`post-item-${index}`}>
+                <div key={index} className="flex items-center justify-between p-2 md:p-3 rounded interactive-slow hover-elevate focus-ring mobile-touch-target" data-testid={`post-item-${index}`}>
                   <div className="flex-1">
                     <h4 className="type-body font-medium">{post.title}</h4>
                     <div className="flex items-center gap-2 mt-1">
