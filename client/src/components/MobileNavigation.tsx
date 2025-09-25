@@ -16,7 +16,7 @@ export default function MobileNavigation({ currentPage = "dashboard" }: MobileNa
   // Close mobile menu when route changes
   useEffect(() => {
     if (isOpen) {
-      if (import.meta.env.DEV) {
+      if (import.meta.env.MODE === 'development') {
         console.log('📱 [MOBILE NAV] Route changed, closing mobile menu:', {
           newLocation: location,
           timestamp: new Date().toISOString()
@@ -28,7 +28,7 @@ export default function MobileNavigation({ currentPage = "dashboard" }: MobileNa
 
   // Debug logging for mobile menu state
   useEffect(() => {
-    if (import.meta.env.DEV) {
+    if (import.meta.env.MODE === 'development') {
       console.log('📱 [MOBILE NAV] Menu state changed:', {
         isOpen,
         currentPage,
