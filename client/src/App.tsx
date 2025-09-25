@@ -18,13 +18,14 @@ import LayoutManager from "@/components/LayoutManager";
 import UsersManager from "@/components/UsersManager";
 import NotFound from "@/pages/not-found";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import HeroBuilderPage from "@/components/HeroBuilderPage";
 
 function Router() {
   const [location] = useLocation();
 
   // Debug logging for route changes
   useEffect(() => {
-    if (import.meta.env.DEV) {
+    if (import.meta.env.MODE === 'development') {
       console.log('🔄 [ROUTER] Route changed:', {
         location,
         timestamp: new Date().toISOString(),
@@ -118,12 +119,10 @@ function Router() {
       
       <Route path="/layout/hero">
         <AdminLayout currentPage={getCurrentPage()}>
-          <div className="p-6">
-            <h1 className="text-3xl font-semibold mb-2">Hero Section</h1>
-            <p className="text-muted-foreground">
-              Hero section management coming soon.
-            </p>
-          </div>
+          <HeroBuilderPage 
+            onSave={(data) => console.log("Save hero:", data)}
+            onPreview={(data) => console.log("Preview hero:", data)}
+          />
         </AdminLayout>
       </Route>
       
@@ -213,7 +212,7 @@ function Router() {
 function App() {
   // Development mode logging
   useEffect(() => {
-    if (import.meta.env.DEV) {
+    if (import.meta.env.MODE === 'development') {
       console.log('🚀 [APP] Penkora CMS starting...', {
         timestamp: new Date().toISOString(),
         version: '1.0.0',
