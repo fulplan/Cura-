@@ -25,7 +25,11 @@ interface SettingsPageProps {
 }
 
 export default function SettingsPage({ 
-  onSave = (settings) => console.log("Save settings:", settings)
+  onSave = (settings) => {
+    // Safe logging - exclude sensitive fields
+    const { smtpPassword, ...safeSettings } = settings;
+    console.log("Save settings (sensitive fields redacted):", safeSettings);
+  }
 }: SettingsPageProps) {
   const [activeTab, setActiveTab] = useState("general");
   const [isDirty, setIsDirty] = useState(false);
@@ -123,6 +127,10 @@ export default function SettingsPage({
     
     setIsSaving(true);
     try {
+      // Create a safe copy for logging (excluding sensitive fields)
+      const { smtpPassword, ...safeSettings } = settings;
+      console.log("Saving settings (sensitive fields redacted):", safeSettings);
+      
       await onSave(settings);
       setIsDirty(false);
       setSaveSuccess(true);

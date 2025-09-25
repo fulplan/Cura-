@@ -251,7 +251,7 @@ export default function AnalyticsPage({
       <div className="space-y-2">
         <label className="text-sm font-medium">Time Period</label>
         <Select value={timePeriod} onValueChange={setTimePeriod}>
-          <SelectTrigger>
+          <SelectTrigger data-testid="time-period-mobile">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -266,7 +266,7 @@ export default function AnalyticsPage({
       <div className="space-y-2">
         <label className="text-sm font-medium">Content Type</label>
         <Select value={contentFilter} onValueChange={setContentFilter}>
-          <SelectTrigger>
+          <SelectTrigger data-testid="content-filter-mobile">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -311,7 +311,7 @@ export default function AnalyticsPage({
           
           <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-2">
-              <FilterSheet title="Analytics Filters">
+              <FilterSheet title="Analytics Filters" data-testid="analytics-filter-sheet">
                 <FilterControls />
               </FilterSheet>
             </div>
@@ -361,7 +361,7 @@ export default function AnalyticsPage({
               <p className="text-sm text-muted-foreground">Website traffic trends over time</p>
             </CardHeader>
             <CardContent>
-              <ChartContainer config={trafficChartConfig} className="h-64 w-full">
+              <ChartContainer config={trafficChartConfig} className="h-64 w-full" data-testid="traffic-overview-chart">
                 <AreaChart data={trafficData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis 
@@ -439,7 +439,7 @@ export default function AnalyticsPage({
                 
                 {/* Desktop: Show pie chart */}
                 <div className="hidden md:block">
-                  <ChartContainer config={deviceChartConfig} className="h-48 w-full">
+                  <ChartContainer config={deviceChartConfig} className="h-48 w-full" data-testid="device-breakdown-chart">
                     <PieChart>
                       <Pie
                         data={deviceData}
