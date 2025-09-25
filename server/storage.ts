@@ -202,15 +202,17 @@ export class PostgreSQLStorage implements IStorage {
   async softDeletePost(id: string): Promise<boolean> {
     const result = await db.update(posts)
       .set({ deletedAt: new Date() })
-      .where(eq(posts.id, id));
-    return result.rowCount > 0;
+      .where(eq(posts.id, id))
+      .returning();
+    return result.length > 0;
   }
 
   async restorePost(id: string): Promise<boolean> {
     const result = await db.update(posts)
       .set({ deletedAt: null })
-      .where(eq(posts.id, id));
-    return result.rowCount > 0;
+      .where(eq(posts.id, id))
+      .returning();
+    return result.length > 0;
   }
 
   async listPosts(filters?: { status?: string; categoryId?: string; authorId?: string; limit?: number; offset?: number; includeDeleted?: boolean }): Promise<{ posts: Post[]; total: number }> {
@@ -358,15 +360,17 @@ export class PostgreSQLStorage implements IStorage {
   async softDeleteCategory(id: string): Promise<boolean> {
     const result = await db.update(categories)
       .set({ deletedAt: new Date() })
-      .where(eq(categories.id, id));
-    return result.rowCount > 0;
+      .where(eq(categories.id, id))
+      .returning();
+    return result.length > 0;
   }
 
   async restoreCategory(id: string): Promise<boolean> {
     const result = await db.update(categories)
       .set({ deletedAt: null })
-      .where(eq(categories.id, id));
-    return result.rowCount > 0;
+      .where(eq(categories.id, id))
+      .returning();
+    return result.length > 0;
   }
 
   // Tags
@@ -418,24 +422,27 @@ export class PostgreSQLStorage implements IStorage {
   async softDeleteTag(id: string): Promise<boolean> {
     const result = await db.update(tags)
       .set({ deletedAt: new Date() })
-      .where(eq(tags.id, id));
-    return result.rowCount > 0;
+      .where(eq(tags.id, id))
+      .returning();
+    return result.length > 0;
   }
 
   async restoreTag(id: string): Promise<boolean> {
     const result = await db.update(tags)
       .set({ deletedAt: null })
-      .where(eq(tags.id, id));
-    return result.rowCount > 0;
+      .where(eq(tags.id, id))
+      .returning();
+    return result.length > 0;
   }
 
   async getPostTags(postId: string): Promise<Tag[]> {
-    return db.select({
+    const result = await db.select({
       id: tags.id,
       name: tags.name,
       slug: tags.slug,
       color: tags.color,
-      createdAt: tags.createdAt
+      createdAt: tags.createdAt,
+      deletedAt: tags.deletedAt
     })
     .from(postTags)
     .innerJoin(tags, eq(postTags.tagId, tags.id))
@@ -443,6 +450,7 @@ export class PostgreSQLStorage implements IStorage {
       eq(postTags.postId, postId),
       sql`${tags.deletedAt} IS NULL`
     ));
+    return result as Tag[];
   }
 
   // Media
@@ -462,14 +470,54 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async deleteMedia(id: string): Promise<boolean> {
-    const result = await db.delete(media).where(eq(media.id, id));
+    // Soft delete by default for safety
+    return this.softDeleteMedia(id);
+  }
+
+  async softDeleteMedia(id: string): Promise<boolean> {
+    const result = await db.update(media)
+      .set({ deletedAt: new Date() })
+      .where(eq(media.id, id))
+      .returning();
     return result.length > 0;
   }
 
-  async listMedia(limit = 50, offset = 0): Promise<{ media: Media[]; total: number }> {
+  async restoreMedia(id: string): Promise<boolean> {
+    const result = await db.update(media)
+      .set({ deletedAt: null })
+      .where(eq(media.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async listMedia(limit = 50, offset = 0, includeDeleted = false): Promise<{ media: Media[]; total: number }> {
+    const baseQuery = db.select().from(media);
+    const countQuery = db.select({ count: count() }).from(media);
+    
+    if (!includeDeleted) {
+      baseQuery.where(sql`${media.deletedAt} IS NULL`);
+      countQuery.where(sql`${media.deletedAt} IS NULL`);
+    }
+    
     const [mediaResult, totalResult] = await Promise.all([
-      db.select().from(media).orderBy(desc(media.createdAt)).limit(limit).offset(offset),
+      baseQuery.orderBy(desc(media.createdAt)).limit(limit).offset(offset),
+      countQuery
+    ]);
+
+    return {
+      media: mediaResult,
+      total: totalResult[0].count as number
+    };
+  }
+
+  async listDeletedMedia(limit = 50, offset = 0): Promise<{ media: Media[]; total: number }> {
+    const [mediaResult, totalResult] = await Promise.all([
+      db.select().from(media)
+        .where(sql`${media.deletedAt} IS NOT NULL`)
+        .orderBy(desc(media.deletedAt))
+        .limit(limit).offset(offset),
       db.select({ count: count() }).from(media)
+        .where(sql`${media.deletedAt} IS NOT NULL`)
     ]);
 
     return {
@@ -562,9 +610,8 @@ export class PostgreSQLStorage implements IStorage {
     
     if (existing) {
       // Update existing setting
-      const updateData: Partial<InsertSetting> = {
-        value,
-        updatedAt: new Date()
+      const updateData: any = {
+        value
       };
       if (category !== undefined) updateData.category = category;
       if (isPublic !== undefined) updateData.isPublic = isPublic;
@@ -596,7 +643,7 @@ export class PostgreSQLStorage implements IStorage {
     if (publicOnly) conditions.push(eq(settings.isPublic, true));
     
     if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+      query = query.where(conditions.length === 1 ? conditions[0] : and(...conditions)) as any;
     }
     
     return query.orderBy(asc(settings.category), asc(settings.key));
@@ -604,7 +651,7 @@ export class PostgreSQLStorage implements IStorage {
 
   async deleteSetting(key: string): Promise<boolean> {
     const result = await db.delete(settings).where(eq(settings.key, key));
-    return result.rowCount > 0;
+    return result.length > 0;
   }
 
   async updateSetting(key: string, updates: Partial<InsertSetting>): Promise<Setting | undefined> {
