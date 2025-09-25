@@ -7,7 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import AdminLayout from "@/components/AdminLayout";
 import Dashboard from "@/components/Dashboard";
-import PostsList from "@/components/PostsList";
+import AllPostsPage from "@/components/AllPostsPage";
 import MediaLibrary from "@/components/MediaLibrary";
 import LayoutManager from "@/components/LayoutManager";
 import UsersManager from "@/components/UsersManager";
@@ -60,9 +60,11 @@ function Router() {
       {/* Posts Routes */}
       <Route path="/posts">
         <AdminLayout currentPage={getCurrentPage()}>
-          <PostsList 
+          <AllPostsPage 
             onCreatePost={() => console.log("Create new post")}
             onEditPost={(id) => console.log("Edit post:", id)}
+            onPreviewPost={(id) => console.log("Preview post:", id)}
+            onDeletePost={(id) => console.log("Delete post:", id)}
           />
         </AdminLayout>
       </Route>
