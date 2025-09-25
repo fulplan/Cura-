@@ -5,6 +5,9 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { AuthProvider } from "@/components/AuthProvider";
+import { useAuth } from "@/hooks/useAuth";
+import LoginPage from "@/components/LoginPage";
 import AdminLayout from "@/components/AdminLayout";
 import Dashboard from "@/components/Dashboard";
 import AllPostsPage from "@/components/AllPostsPage";
@@ -24,12 +27,12 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import HeroBuilderPage from "@/components/HeroBuilderPage";
 import WidgetsManagerPage from "@/components/WidgetsManagerPage";
 
-function Router() {
+function AuthenticatedRouter() {
   const [location, setLocation] = useLocation();
 
   // Debug logging for route changes
   useEffect(() => {
-    if (import.meta.env && import.meta.env.DEV) {
+    if (import.meta.env?.DEV) {
       console.log('🔄 [ROUTER] Route changed:', {
         location,
         timestamp: new Date().toISOString(),
@@ -210,14 +213,38 @@ function Router() {
   );
 }
 
+function Router() {
+  const { user, isLoading, isAuthenticated } = useAuth();
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
+  // Show admin interface if authenticated
+  return <AuthenticatedRouter />;
+}
+
 function App() {
   // Development mode logging
   useEffect(() => {
-    if (import.meta.env && import.meta.env.DEV) {
+    if (import.meta.env?.DEV) {
       console.log('🚀 [APP] Penkora CMS starting...', {
         timestamp: new Date().toISOString(),
         version: '1.0.0',
-        environment: import.meta.env ? import.meta.env.MODE : 'development'
+        environment: import.meta.env?.MODE || 'development'
       });
     }
   }, []);
@@ -226,10 +253,12 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="system" storageKey="penkora-ui-theme">
         <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
+          <AuthProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </AuthProvider>
         </QueryClientProvider>
       </ThemeProvider>
     </ErrorBoundary>
