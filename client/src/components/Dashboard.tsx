@@ -51,8 +51,8 @@ export default function Dashboard({ onQuickAction }: DashboardProps) {
     <div className="py-4 md:py-6 space-y-4 md:space-y-6">
       {/* Welcome Section */}
       <div>
-        <h1 className="type-title mb-2" data-testid="text-dashboard-title">Welcome back!</h1>
-        <p className="type-body text-muted-foreground">Here's what's happening with your content today.</p>
+        <h1 className="type-hero mb-2" data-testid="text-dashboard-title">Welcome back!</h1>
+        <p className="type-body-large text-muted-foreground">Here's what's happening with your content today.</p>
       </div>
 
       {/* Stats Cards */}
@@ -62,11 +62,13 @@ export default function Dashboard({ onQuickAction }: DashboardProps) {
             <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="type-caption">{stat.title}</p>
-                  <p className="text-lg md:text-2xl font-bold num">{stat.value}</p>
-                  <p className="text-xs text-green-500 num">{stat.change}</p>
+                  <p className="type-overline">{stat.title}</p>
+                  <p className="type-heading num">{stat.value}</p>
+                  <p className="type-caption text-success num">{stat.change}</p>
                 </div>
-                <stat.icon className={`w-6 h-6 md:w-8 md:h-8 ${stat.color}`} />
+                <div className="rounded-lg bg-primary/10 p-2">
+                  <stat.icon className="w-5 h-5 md:w-6 md:h-6 text-primary" />
+                </div>
               </div>
             </CardContent>
           </Card>

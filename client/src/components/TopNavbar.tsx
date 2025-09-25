@@ -67,9 +67,14 @@ export default function TopNavbar({ onSearch, currentPage }: TopNavbarProps) {
         </TooltipProvider>
         
         <div className="flex items-center gap-2 md:gap-3">
-          <h1 className="type-subtitle font-bold text-foreground">
-            Penkora
-          </h1>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-sm">P</span>
+            </div>
+            <h1 className="type-heading font-bold text-foreground">
+              Penkora
+            </h1>
+          </div>
         </div>
         
         <form onSubmit={handleSearch} className="relative hidden md:block flex-1 max-w-md">

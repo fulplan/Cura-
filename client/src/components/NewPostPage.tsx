@@ -296,24 +296,27 @@ export default function NewPostPage({
       <PageHeader>
         <div className="px-4 md:px-6">
           <PageToolbar>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Button 
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setLocation("/posts")}
                 data-testid="back-button"
                 aria-label="Go back to posts"
+                className="hover:bg-accent"
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className="h-5 w-5" />
               </Button>
-              <PageTitle>
-                {formData.title || "New Post"}
-              </PageTitle>
-              {isDirty && (
-                <Badge variant="outline" className="text-xs">
-                  Unsaved
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                <PageTitle className="type-heading">
+                  {formData.title || "New Post"}
+                </PageTitle>
+                {isDirty && (
+                  <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/20">
+                    Unsaved
+                  </Badge>
+                )}
+              </div>
             </div>
             <PageActions>
               <div className="hidden md:flex items-center gap-2">
