@@ -14,8 +14,19 @@ export default function EditPostPage() {
   const [previewData, setPreviewData] = useState<any>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
+  // Show error toast when error occurs
+  React.useEffect(() => {
+    if (error) {
+      toast({
+        title: "Failed to load post",
+        description: "Unable to load the post for editing. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
+
   // Handle form save (update)
-  const handleSave = async (formData: any) => {
+  const handleSave = React.useCallback(async (formData: any) => {
     if (!id) return;
     
     try {
@@ -31,10 +42,10 @@ export default function EditPostPage() {
         variant: "destructive",
       });
     }
-  };
+  }, [id, updateMutation, toast]);
 
   // Handle form publish (update with published status)
-  const handlePublish = async (formData: any) => {
+  const handlePublish = React.useCallback(async (formData: any) => {
     if (!id) return;
     
     try {
@@ -55,13 +66,32 @@ export default function EditPostPage() {
         variant: "destructive",
       });
     }
-  };
+  }, [id, updateMutation, toast]);
 
   // Handle preview
-  const handlePreview = (formData: any) => {
+  const handlePreview = React.useCallback((formData: any) => {
     setPreviewData(formData);
     setIsPreviewOpen(true);
-  };
+  }, []);
+
+  // Transform post data for the form
+  const initialFormData = React.useMemo(() => {
+    if (!post) return undefined;
+    
+    return {
+      title: post.title || "",
+      content: post.content || "",
+      excerpt: post.excerpt || "",
+      category: post.categoryId || "",
+      tags: post.tags?.map((tag: any) => tag.name) || [],
+      status: post.status || "draft",
+      featured: post.featured || false,
+      allowComments: post.allowComments !== false, // Default to true
+      seoTitle: post.seoTitle || "",
+      seoDescription: post.seoDescription || "",
+      publishDate: post.publishedAt ? new Date(post.publishedAt).toISOString().split('T')[0] : ""
+    };
+  }, [post]);
 
   // Show loading state
   if (isLoading) {
@@ -77,17 +107,6 @@ export default function EditPostPage() {
     );
   }
 
-  // Show error toast when error occurs
-  React.useEffect(() => {
-    if (error) {
-      toast({
-        title: "Failed to load post",
-        description: "Unable to load the post for editing. Please try again.",
-        variant: "destructive",
-      });
-    }
-  }, [error, toast]);
-
   // Show error state
   if (error) {
     return (
@@ -99,21 +118,6 @@ export default function EditPostPage() {
       </div>
     );
   }
-
-  // Transform post data for the form
-  const initialFormData = post ? {
-    title: post.title || "",
-    content: post.content || "",
-    excerpt: post.excerpt || "",
-    category: post.categoryId || "",
-    tags: post.tags?.map((tag: any) => tag.name) || [],
-    status: post.status || "draft",
-    featured: post.featured || false,
-    allowComments: post.allowComments !== false, // Default to true
-    seoTitle: post.seoTitle || "",
-    seoDescription: post.seoDescription || "",
-    publishDate: post.publishedAt ? new Date(post.publishedAt).toISOString().split('T')[0] : ""
-  } : undefined;
 
   return (
     <>
