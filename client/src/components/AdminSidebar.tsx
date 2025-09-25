@@ -153,8 +153,7 @@ export default function AdminSidebar({ activeItem = "dashboard", onNavigate }: A
                 isActive={isActiveRoute(item.url)}
                 data-testid={`sidebar-${item.url.replace(/\//g, '-').replace(/^-/, '')}`}
                 className={cn(
-                  "w-full justify-start transition-all duration-200 hover:scale-[1.01] active:scale-[0.98]",
-                  "hover:shadow-sm active:shadow-none",
+                  "w-full justify-start transition-colors duration-200",
                   isActiveRoute(item.url) && "bg-primary/10 text-primary font-medium"
                 )}
               >

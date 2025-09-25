@@ -19,10 +19,10 @@ interface DashboardProps {
 export default function Dashboard({ onQuickAction }: DashboardProps) {
   // TODO: Remove mock data
   const stats = [
-    { title: "Total Posts", value: "124", change: "+12%", icon: FileText, color: "text-primary" },
-    { title: "Active Users", value: "48", change: "+8%", icon: Users, color: "text-primary" },
-    { title: "Page Views", value: "15.2k", change: "+23%", icon: Eye, color: "text-primary" },
-    { title: "Monthly Growth", value: "18%", change: "+5%", icon: TrendingUp, color: "text-primary" },
+    { title: "Total Posts", value: "124", change: "+12%", icon: FileText },
+    { title: "Active Users", value: "48", change: "+8%", icon: Users },
+    { title: "Page Views", value: "15.2k", change: "+23%", icon: Eye },
+    { title: "Monthly Growth", value: "18%", change: "+5%", icon: TrendingUp },
   ];
 
   const recentPosts = [
@@ -40,9 +40,9 @@ export default function Dashboard({ onQuickAction }: DashboardProps) {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "published": return "bg-green-500 text-white";
-      case "draft": return "bg-yellow-500 text-white";
-      case "scheduled": return "bg-blue-500 text-white";
+      case "published": return "bg-success text-success-foreground";
+      case "draft": return "bg-warning text-warning-foreground";
+      case "scheduled": return "bg-info text-info-foreground";
       default: return "bg-muted text-muted-foreground";
     }
   };
