@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "wouter";
 import { useEffect } from "react";
 import { useSidebar } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 
 interface AdminSidebarProps {
   activeItem?: string;
@@ -35,7 +36,7 @@ interface AdminSidebarProps {
 
 export default function AdminSidebar({ activeItem = "dashboard", onNavigate }: AdminSidebarProps) {
   const [location] = useLocation();
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
 
   // Debug logging for sidebar navigation
   useEffect(() => {
@@ -151,7 +152,10 @@ export default function AdminSidebar({ activeItem = "dashboard", onNavigate }: A
                 asChild
                 isActive={isActiveRoute(item.url)}
                 data-testid={`sidebar-${item.url.replace(/\//g, '-').replace(/^-/, '')}`}
-                className="w-full justify-start"
+                className={cn(
+                  "w-full justify-start transition-all duration-200 hover:scale-[1.01] active:scale-[0.98]",
+                  "hover:shadow-sm active:shadow-none"
+                )}
               >
                 <Link 
                   href={item.url}
@@ -164,16 +168,20 @@ export default function AdminSidebar({ activeItem = "dashboard", onNavigate }: A
                         timestamp: new Date().toISOString()
                       });
                     }
-                    // Close mobile menu when navigating
+                    // Close mobile sheet when navigating
+                    if (isMobile) {
+                      setOpenMobile(false);
+                    }
                     onNavigate?.();
                   }}
+                  className="flex items-center gap-2 w-full transition-colors duration-150 group"
                 >
-                  <item.icon className="w-4 h-4" />
+                  <item.icon className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" />
                   {state === "expanded" && (
                     <>
-                      <span>{item.title}</span>
+                      <span className="transition-opacity duration-200">{item.title}</span>
                       {item.badge && (
-                        <Badge variant="secondary" className="ml-auto">
+                        <Badge variant="secondary" className="ml-auto transition-all duration-200 hover:scale-105">
                           {item.badge}
                         </Badge>
                       )}
@@ -189,8 +197,8 @@ export default function AdminSidebar({ activeItem = "dashboard", onNavigate }: A
   );
 
   return (
-    <Sidebar>
-      <SidebarContent>
+    <Sidebar className="transition-all duration-300 ease-in-out">
+      <SidebarContent className="space-y-1">
         {renderMenuItems(menuItems)}
         {renderMenuItems(contentItems, "Content")}
         {renderMenuItems(layoutItems, "Layout Manager")}

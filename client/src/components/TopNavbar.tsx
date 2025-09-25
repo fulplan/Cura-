@@ -1,4 +1,4 @@
-import { Search, Bell, User, Settings, LogOut, PanelLeft, PanelLeftOpen } from "lucide-react";
+import { Search, Bell, User, Settings, LogOut, PanelLeft, PanelLeftOpen, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,7 +9,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import MobileNavigation from "./MobileNavigation";
 import { ThemeToggle } from "./ThemeToggle";
 import { useSidebar } from "@/components/ui/sidebar";
 import {
@@ -25,7 +24,7 @@ interface TopNavbarProps {
 }
 
 export default function TopNavbar({ onSearch, currentPage }: TopNavbarProps) {
-  const { state, toggleSidebar, isMobile } = useSidebar();
+  const { state, toggleSidebar, isMobile, openMobile } = useSidebar();
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -37,30 +36,32 @@ export default function TopNavbar({ onSearch, currentPage }: TopNavbarProps) {
   return (
     <header className="flex items-center justify-between p-3 md:p-4 border-b bg-card">
       <div className="flex items-center gap-3 md:gap-6 flex-1">
-        {/* Mobile Navigation */}
-        <MobileNavigation currentPage={currentPage} />
-        
-        {/* Sidebar Toggle - Visible on all screen sizes */}
+        {/* Unified Sidebar Toggle - Contextual icons for mobile/desktop */}
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="flex"
+                className="flex transition-transform duration-200 hover:scale-105"
                 onClick={toggleSidebar}
-                aria-pressed={state === "expanded"}
+                aria-pressed={isMobile ? openMobile : state === "expanded"}
                 data-testid="button-sidebar-toggle"
               >
-                {state === "collapsed" ? 
-                  <PanelLeft className="w-5 h-5" /> : 
-                  <PanelLeftOpen className="w-5 h-5" />
-                }
-                <span className="sr-only">Toggle sidebar</span>
+                {isMobile ? (
+                  <Menu className="w-5 h-5" />
+                ) : (
+                  state === "collapsed" ? 
+                    <PanelLeft className="w-5 h-5" /> : 
+                    <PanelLeftOpen className="w-5 h-5" />
+                )}
+                <span className="sr-only">
+                  {isMobile ? "Open navigation menu" : (state === "collapsed" ? "Open sidebar" : "Close sidebar")}
+                </span>
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              <p>{state === "collapsed" ? "Open sidebar" : "Close sidebar"}</p>
+              <p>{isMobile ? "Open menu" : (state === "collapsed" ? "Open sidebar" : "Close sidebar")}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
