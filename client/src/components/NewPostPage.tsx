@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { ArrowLeft, Save, Eye, MoreHorizontal, ImagePlus, Tag, Settings, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,12 +24,18 @@ import {
 import { RichTextEditor, type RichTextEditorRef } from "@/components/ui/rich-text-editor";
 
 interface NewPostPageProps {
+  mode?: 'create' | 'edit';
+  initialData?: any;
+  isLoading?: boolean;
   onSave?: (data: any) => void;
   onPublish?: (data: any) => void;
   onPreview?: (data: any) => void;
 }
 
 export default function NewPostPage({ 
+  mode = 'create',
+  initialData,
+  isLoading = false,
   onSave = (data) => console.log("Save post:", data),
   onPublish = (data) => console.log("Publish post:", data),
   onPreview = (data) => console.log("Preview post:", data)
@@ -37,7 +43,7 @@ export default function NewPostPage({
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("content");
   const editorRef = useRef<RichTextEditorRef>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => initialData || {
     title: "",
     content: "",
     excerpt: "",
@@ -50,6 +56,14 @@ export default function NewPostPage({
     seoDescription: "",
     publishDate: ""
   });
+
+  // Update form data when initialData changes (for edit mode)
+  useEffect(() => {
+    if (initialData && mode === 'edit') {
+      setFormData(initialData);
+      setIsDirty(false);
+    }
+  }, [initialData, mode]);
 
   const [newTag, setNewTag] = useState("");
   const [isDirty, setIsDirty] = useState(false);
@@ -72,12 +86,16 @@ export default function NewPostPage({
 
   const handleSave = () => {
     onSave(formData);
-    setIsDirty(false);
+    if (!isLoading) {
+      setIsDirty(false);
+    }
   };
 
   const handlePublish = () => {
     onPublish({ ...formData, status: "published" });
-    setIsDirty(false);
+    if (!isLoading) {
+      setIsDirty(false);
+    }
   };
 
   const handlePreview = () => {
@@ -309,7 +327,7 @@ export default function NewPostPage({
               </Button>
               <div className="flex items-center gap-2">
                 <PageTitle className="type-heading">
-                  {formData.title || "New Post"}
+                  {formData.title || (mode === 'edit' ? "Edit Post" : "New Post")}
                 </PageTitle>
                 {isDirty && (
                   <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/20">
@@ -324,13 +342,22 @@ export default function NewPostPage({
                   <Eye className="h-4 w-4 mr-2" />
                   Preview
                 </Button>
-                <Button variant="outline" onClick={handleSave} data-testid="save-desktop">
+                <Button 
+                  variant="outline" 
+                  onClick={handleSave} 
+                  disabled={isLoading}
+                  data-testid="save-desktop"
+                >
                   <Save className="h-4 w-4 mr-2" />
-                  Save Draft
+                  {isLoading ? "Saving..." : (mode === 'edit' ? "Save Changes" : "Save Draft")}
                 </Button>
-                <Button onClick={handlePublish} data-testid="publish-desktop">
+                <Button 
+                  onClick={handlePublish} 
+                  disabled={isLoading}
+                  data-testid="publish-desktop"
+                >
                   <Globe className="h-4 w-4 mr-2" />
-                  Publish
+                  {isLoading ? "Publishing..." : "Publish"}
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -423,13 +450,24 @@ export default function NewPostPage({
       {/* Mobile Action Bar */}
       <ActionBar show={true}>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleSave} data-testid="save-mobile">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleSave} 
+            disabled={isLoading}
+            data-testid="save-mobile"
+          >
             <Save className="h-4 w-4 mr-1" />
-            Save
+            {isLoading ? "Saving..." : (mode === 'edit' ? "Save" : "Save")}
           </Button>
-          <Button size="sm" onClick={handlePublish} data-testid="publish-mobile">
+          <Button 
+            size="sm" 
+            onClick={handlePublish} 
+            disabled={isLoading}
+            data-testid="publish-mobile"
+          >
             <Globe className="h-4 w-4 mr-1" />
-            Publish
+            {isLoading ? "Publishing..." : "Publish"}
           </Button>
         </div>
         <Button variant="outline" size="sm" onClick={handlePreview} data-testid="preview-mobile">

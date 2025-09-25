@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import React from "react";
 import { Link } from "wouter";
 import { Search, Filter, MoreHorizontal, Edit, Eye, Trash2, Plus, Grid, List } from "lucide-react";
+import { usePostsWithDetails, useDeletePost, mockPosts } from "@/hooks/usePosts";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -24,18 +27,26 @@ import {
 import { EmptyStates } from "@/components/ui/empty-state";
 import { LoadingCard, LoadingTable } from "@/components/ui/loading";
 
-interface Post {
+interface PostWithDetails {
   id: string;
   title: string;
-  status: "published" | "draft" | "scheduled";
-  author: {
-    name: string;
-    avatar?: string;
-  };
-  category: string;
-  publishDate: string;
-  views: number;
+  slug: string;
   excerpt: string;
+  status: "published" | "draft" | "scheduled";
+  viewCount: number;
+  publishedAt: string | null;
+  createdAt: string;
+  author: {
+    id: string;
+    username: string;
+    displayName: string;
+  } | null;
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+    color: string;
+  } | null;
 }
 
 interface AllPostsPageProps {
@@ -45,39 +56,19 @@ interface AllPostsPageProps {
   onDeletePost?: (id: string) => void;
 }
 
-// Mock data - in real app, this would come from API
-const mockPosts: Post[] = [
-  {
-    id: "1",
-    title: "Getting Started with React and TypeScript",
-    status: "published",
-    author: { name: "Sarah Chen", avatar: "/avatars/sarah.jpg" },
-    category: "Development",
-    publishDate: "2024-03-15",
-    views: 1247,
-    excerpt: "Learn how to set up a modern React project with TypeScript for better development experience..."
-  },
-  {
-    id: "2", 
-    title: "10 Tips for Better UI Design",
-    status: "draft",
-    author: { name: "Mike Johnson", avatar: "/avatars/mike.jpg" },
-    category: "Design",
-    publishDate: "2024-03-20",
-    views: 0,
-    excerpt: "Discover essential UI design principles that will improve your user interface designs..."
-  },
-  {
-    id: "3",
-    title: "The Future of Web Development",
-    status: "scheduled",
-    author: { name: "Alex Rivera", avatar: "/avatars/alex.jpg" },
-    category: "Technology",
-    publishDate: "2024-03-25",
-    views: 0,
-    excerpt: "Exploring upcoming trends and technologies that will shape the future of web development..."
-  }
-];
+// Transform API data to match component expectations
+const transformPostData = (apiPost: any): PostWithDetails => ({
+  id: apiPost.id,
+  title: apiPost.title,
+  slug: apiPost.slug,
+  excerpt: apiPost.excerpt || "",
+  status: apiPost.status,
+  viewCount: apiPost.viewCount || 0,
+  publishedAt: apiPost.publishedAt,
+  createdAt: apiPost.createdAt,
+  author: apiPost.author || { id: "", username: "Unknown", displayName: "Unknown User" },
+  category: apiPost.category || { id: "", name: "Uncategorized", slug: "uncategorized", color: "#6b7280" }
+});
 
 export default function AllPostsPage({ 
   onCreatePost = () => console.log("Create post"),
@@ -90,16 +81,55 @@ export default function AllPostsPage({
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  
+  const { toast } = useToast();
+  
+  // Fetch posts with details (author, category info)
+  const { data: postsData, isLoading, error } = usePostsWithDetails();
+  const deleteMutation = useDeletePost();
+  
+  // Show error notification if API call fails (only once)
+  React.useEffect(() => {
+    if (error && !postsData) {
+      toast({
+        title: "Connection Error",
+        description: "Unable to load posts from server. Showing offline data.",
+        variant: "destructive",
+      });
+    }
+  }, [error, postsData, toast]);
+  
+  // Use real data if available, otherwise fall back to mock data
+  const rawPosts = postsData || mockPosts;
+  const posts: PostWithDetails[] = rawPosts.map(transformPostData);
 
   // Filter posts based on search and filters
-  const filteredPosts = mockPosts.filter(post => {
+  const filteredPosts = posts.filter(post => {
     const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         post.author.name.toLowerCase().includes(searchQuery.toLowerCase());
+                         post.author?.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         post.excerpt.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || post.status === statusFilter;
-    const matchesCategory = categoryFilter === "all" || post.category === categoryFilter;
+    const matchesCategory = categoryFilter === "all" || post.category?.name === categoryFilter;
     return matchesSearch && matchesStatus && matchesCategory;
   });
+  
+  // Handle post deletion
+  const handleDeletePost = async (postId: string) => {
+    try {
+      await deleteMutation.mutateAsync(postId);
+      toast({
+        title: "Post deleted",
+        description: "The post has been successfully deleted.",
+      });
+      onDeletePost(postId);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete the post. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleSelectPost = (postId: string, checked: boolean) => {
     if (checked) {
@@ -117,7 +147,7 @@ export default function AllPostsPage({
     }
   };
 
-  const getStatusBadge = (status: Post["status"]) => {
+  const getStatusBadge = (status: PostWithDetails["status"]) => {
     const variants = {
       published: "default",
       draft: "secondary", 
@@ -131,7 +161,7 @@ export default function AllPostsPage({
     );
   };
 
-  const PostCard = ({ post }: { post: Post }) => (
+  const PostCard = ({ post }: { post: PostWithDetails }) => (
     <Card className="hover-elevate" data-testid={`post-card-${post.id}`}>
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between">
@@ -161,8 +191,9 @@ export default function AllPostsPage({
                 Preview
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onClick={() => onDeletePost(post.id)}
+                onClick={() => handleDeletePost(post.id)}
                 className="text-destructive focus:text-destructive"
+                disabled={deleteMutation.isPending}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete
@@ -172,7 +203,7 @@ export default function AllPostsPage({
         </div>
         <div className="flex items-center gap-2">
           {getStatusBadge(post.status)}
-          <span className="text-xs text-muted-foreground">{post.category}</span>
+          <span className="text-xs text-muted-foreground">{post.category?.name || "Uncategorized"}</span>
         </div>
       </CardHeader>
       <CardContent className="pt-2">
@@ -182,24 +213,23 @@ export default function AllPostsPage({
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <Avatar className="h-5 w-5">
-              <AvatarImage src={post.author.avatar} />
               <AvatarFallback className="text-xs">
-                {post.author.name.split(" ").map(n => n[0]).join("")}
+                {post.author?.displayName.split(" ").map(n => n[0]).join("") || "U"}
               </AvatarFallback>
             </Avatar>
-            <span>{post.author.name}</span>
+            <span>{post.author?.displayName || "Unknown User"}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span>{post.views} views</span>
+            <span>{post.viewCount} views</span>
             <span>•</span>
-            <span>{new Date(post.publishDate).toLocaleDateString()}</span>
+            <span>{new Date(post.publishedAt || post.createdAt).toLocaleDateString()}</span>
           </div>
         </div>
       </CardContent>
     </Card>
   );
 
-  const PostTableRow = ({ post }: { post: Post }) => (
+  const PostTableRow = ({ post }: { post: PostWithDetails }) => (
     <TableRow key={post.id} data-testid={`post-row-${post.id}`}>
       <TableCell className="w-12">
         <Checkbox
@@ -218,17 +248,16 @@ export default function AllPostsPage({
       <TableCell>
         <div className="flex items-center gap-2">
           <Avatar className="h-6 w-6">
-            <AvatarImage src={post.author.avatar} />
             <AvatarFallback className="text-xs">
-              {post.author.name.split(" ").map(n => n[0]).join("")}
+              {post.author?.displayName.split(" ").map(n => n[0]).join("") || "U"}
             </AvatarFallback>
           </Avatar>
-          <span className="text-sm">{post.author.name}</span>
+          <span className="text-sm">{post.author?.displayName || "Unknown User"}</span>
         </div>
       </TableCell>
-      <TableCell className="text-sm">{post.category}</TableCell>
-      <TableCell className="text-sm">{post.views}</TableCell>
-      <TableCell className="text-sm">{new Date(post.publishDate).toLocaleDateString()}</TableCell>
+      <TableCell className="text-sm">{post.category?.name || "Uncategorized"}</TableCell>
+      <TableCell className="text-sm">{post.viewCount}</TableCell>
+      <TableCell className="text-sm">{new Date(post.publishedAt || post.createdAt).toLocaleDateString()}</TableCell>
       <TableCell className="w-12">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -246,11 +275,12 @@ export default function AllPostsPage({
               Preview
             </DropdownMenuItem>
             <DropdownMenuItem 
-              onClick={() => onDeletePost(post.id)}
+              onClick={() => handleDeletePost(post.id)}
               className="text-destructive focus:text-destructive"
+              disabled={deleteMutation.isPending}
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              Delete
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -393,7 +423,7 @@ export default function AllPostsPage({
               </p>
             </div>
           ) : (
-            <EmptyStates.Posts onCreatePost={onCreatePost} />
+            <EmptyStates.Posts />
           )
         ) : (
           <>

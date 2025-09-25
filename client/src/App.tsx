@@ -9,6 +9,7 @@ import AdminLayout from "@/components/AdminLayout";
 import Dashboard from "@/components/Dashboard";
 import AllPostsPage from "@/components/AllPostsPage";
 import NewPostPage from "@/components/NewPostPage";
+import EditPostPage from "@/components/EditPostPage";
 import CategoriesPage from "@/components/CategoriesPage";
 import MediaLibraryPage from "@/components/MediaLibraryPage";
 import UploadPage from "@/components/UploadPage";
@@ -24,11 +25,11 @@ import HeroBuilderPage from "@/components/HeroBuilderPage";
 import WidgetsManagerPage from "@/components/WidgetsManagerPage";
 
 function Router() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
 
   // Debug logging for route changes
   useEffect(() => {
-    if (import.meta.env.MODE === 'development') {
+    if (import.meta.env.DEV) {
       console.log('🔄 [ROUTER] Route changed:', {
         location,
         timestamp: new Date().toISOString(),
@@ -70,8 +71,8 @@ function Router() {
       <Route path="/posts">
         <AdminLayout currentPage={getCurrentPage()}>
           <AllPostsPage 
-            onCreatePost={() => console.log("Create new post")}
-            onEditPost={(id) => console.log("Edit post:", id)}
+            onCreatePost={() => setLocation("/posts/new")}
+            onEditPost={(id) => setLocation(`/posts/edit/${id}`)}
             onPreviewPost={(id) => console.log("Preview post:", id)}
             onDeletePost={(id) => console.log("Delete post:", id)}
           />
@@ -85,6 +86,12 @@ function Router() {
             onPublish={(data) => console.log("Publish post:", data)}
             onPreview={(data) => console.log("Preview post:", data)}
           />
+        </AdminLayout>
+      </Route>
+      
+      <Route path="/posts/edit/:id">
+        <AdminLayout currentPage={getCurrentPage()}>
+          <EditPostPage />
         </AdminLayout>
       </Route>
       
@@ -210,7 +217,7 @@ function Router() {
 function App() {
   // Development mode logging
   useEffect(() => {
-    if (import.meta.env.MODE === 'development') {
+    if (import.meta.env.DEV) {
       console.log('🚀 [APP] Penkora CMS starting...', {
         timestamp: new Date().toISOString(),
         version: '1.0.0',

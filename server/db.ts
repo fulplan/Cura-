@@ -4,6 +4,14 @@ import ws from "ws";
 import * as schema from "@shared/schema";
 
 neonConfig.webSocketConstructor = ws;
+// Configure for development with proper SSL handling
+if (process.env.NODE_ENV === 'development') {
+  // Disable SSL verification for development
+  neonConfig.wsProxy = (host, port) => `${host}:${port}/v2`;
+  neonConfig.useSecureWebSocket = true;
+  // Skip SSL verification in development
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
