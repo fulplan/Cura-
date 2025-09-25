@@ -81,6 +81,9 @@ export interface IStorage {
   getSettings(category?: string, publicOnly?: boolean): Promise<Setting[]>;
   deleteSetting(key: string): Promise<boolean>;
   updateSetting(key: string, updates: Partial<InsertSetting>): Promise<Setting | undefined>;
+  
+  // Email service initialization
+  initializeEmailService(): Promise<void>;
 }
 
 export class PostgreSQLStorage implements IStorage {
@@ -610,6 +613,42 @@ export class PostgreSQLStorage implements IStorage {
       .where(eq(settings.key, key))
       .returning();
     return result[0];
+  }
+
+  async initializeEmailService(): Promise<void> {
+    try {
+      // Get email settings
+      const emailSettings = await this.getSettings('email', false);
+      const settingsMap: { [key: string]: any } = {};
+      
+      emailSettings.forEach(setting => {
+        settingsMap[setting.key] = setting.value;
+      });
+
+      // Check if SMTP is configured
+      if (settingsMap.emailProvider === 'smtp' && 
+          settingsMap.smtpHost && 
+          settingsMap.smtpUsername && 
+          settingsMap.smtpPassword) {
+        
+        const { emailService } = await import('./services/emailService');
+        await emailService.initialize({
+          provider: 'smtp',
+          smtpHost: settingsMap.smtpHost,
+          smtpPort: parseInt(settingsMap.smtpPort) || 587,
+          smtpUsername: settingsMap.smtpUsername,
+          smtpPassword: settingsMap.smtpPassword,
+          fromEmail: settingsMap.fromEmail || 'noreply@example.com',
+          fromName: settingsMap.fromName || 'CMS',
+        });
+        
+        console.log('✅ Email service initialized from settings');
+      } else {
+        console.log('📧 Email service not configured - SMTP settings missing');
+      }
+    } catch (error) {
+      console.error('❌ Failed to initialize email service:', error);
+    }
   }
 }
 

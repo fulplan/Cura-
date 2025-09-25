@@ -805,6 +805,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Category trash routes
+  app.delete("/api/categories/:id", requireEditor, async (req, res) => {
+    try {
+      const success = await storage.softDeleteCategory(req.params.id);
+      if (!success) {
+        return sendError(res, 404, "Category not found");
+      }
+      res.json({ message: "Category moved to trash" });
+    } catch (error) {
+      console.error("Delete category error:", error);
+      sendError(res, 500, "Failed to move category to trash");
+    }
+  });
+
+  app.post("/api/trash/categories/:id/restore", requireAuth, async (req, res) => {
+    try {
+      const restored = await storage.restoreCategory(req.params.id);
+      if (!restored) {
+        return sendError(res, 404, "Category not found");
+      }
+      res.json({ message: "Category restored successfully" });
+    } catch (error) {
+      console.error("Restore category error:", error);
+      sendError(res, 500, "Failed to restore category");
+    }
+  });
+
+  // Tag trash routes
+  app.delete("/api/tags/:id", requireEditor, async (req, res) => {
+    try {
+      const success = await storage.softDeleteTag(req.params.id);
+      if (!success) {
+        return sendError(res, 404, "Tag not found");
+      }
+      res.json({ message: "Tag moved to trash" });
+    } catch (error) {
+      console.error("Delete tag error:", error);
+      sendError(res, 500, "Failed to move tag to trash");
+    }
+  });
+
+  app.post("/api/trash/tags/:id/restore", requireAuth, async (req, res) => {
+    try {
+      const restored = await storage.restoreTag(req.params.id);
+      if (!restored) {
+        return sendError(res, 404, "Tag not found");
+      }
+      res.json({ message: "Tag restored successfully" });
+    } catch (error) {
+      console.error("Restore tag error:", error);
+      sendError(res, 500, "Failed to restore tag");
+    }
+  });
+
   // Settings Routes
   
   // Get all settings (admin) or public settings (everyone)
@@ -851,6 +905,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const setting = await storage.setSetting(key, value, category, isPublic, description);
+      
+      // Reinitialize email service if email settings were changed
+      if (category === 'email' || key.startsWith('email') || key.startsWith('smtp') || key.startsWith('from')) {
+        await storage.initializeEmailService();
+      }
+      
       res.json(setting);
     } catch (error) {
       console.error("Set setting error:", error);
@@ -866,6 +926,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!setting) {
         return sendError(res, 404, "Setting not found");
+      }
+
+      // Reinitialize email service if email settings were changed
+      const key = req.params.key;
+      if (setting.category === 'email' || key.startsWith('email') || key.startsWith('smtp') || key.startsWith('from')) {
+        await storage.initializeEmailService();
       }
 
       res.json(setting);
@@ -888,6 +954,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Delete setting error:", error);
       handleDbError(error, res, "Failed to delete setting");
+    }
+  });
+
+  // Email Routes
+  
+  // Test email configuration
+  app.post("/api/email/test", requireAdmin, async (req, res) => {
+    try {
+      const { emailService } = await import('./services/emailService');
+      
+      if (!emailService.isConfigured()) {
+        return sendError(res, 400, "Email service is not configured");
+      }
+      
+      const testResult = await emailService.testConnection();
+      if (!testResult) {
+        return sendError(res, 400, "Email connection test failed");
+      }
+      
+      res.json({ message: "Email connection test successful" });
+    } catch (error) {
+      console.error("Email test error:", error);
+      sendError(res, 500, "Failed to test email connection");
+    }
+  });
+
+  // Send test email
+  app.post("/api/email/send-test", requireAdmin, async (req, res) => {
+    try {
+      const { to } = req.body;
+      
+      if (!to) {
+        return sendError(res, 400, "Recipient email is required");
+      }
+      
+      const { emailService } = await import('./services/emailService');
+      
+      if (!emailService.isConfigured()) {
+        return sendError(res, 400, "Email service is not configured");
+      }
+      
+      const success = await emailService.sendEmail(
+        to,
+        "Test Email from Penkora CMS",
+        "<h2>Test Email</h2><p>This is a test email sent from your CMS to verify the email configuration is working correctly.</p>",
+        "Test Email: This is a test email sent from your CMS to verify the email configuration is working correctly."
+      );
+      
+      if (!success) {
+        return sendError(res, 500, "Failed to send test email");
+      }
+      
+      res.json({ message: "Test email sent successfully" });
+    } catch (error) {
+      console.error("Send test email error:", error);
+      sendError(res, 500, "Failed to send test email");
     }
   });
 

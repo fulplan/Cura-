@@ -92,7 +92,16 @@ app.use((req, res, next) => {
     port,
     host: "0.0.0.0",
     reusePort: true,
-  }, () => {
+  }, async () => {
     log(`serving on port ${port}`);
+    
+    // Initialize email service on startup
+    try {
+      const { storage } = await import('./storage');
+      await storage.initializeEmailService();
+      log(`📧 Email service initialization completed`);
+    } catch (error) {
+      log(`❌ Failed to initialize email service on startup: ${error}`);
+    }
   });
 })();
