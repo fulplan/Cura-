@@ -97,7 +97,7 @@ export class PostgreSQLStorage implements IStorage {
 
   async deleteUser(id: string): Promise<boolean> {
     const result = await db.delete(users).where(eq(users.id, id));
-    return (result.rowCount ?? 0) > 0;
+    return result.length > 0;
   }
 
   async listUsers(): Promise<User[]> {
@@ -163,7 +163,7 @@ export class PostgreSQLStorage implements IStorage {
 
   async deletePost(id: string): Promise<boolean> {
     const result = await db.delete(posts).where(eq(posts.id, id));
-    return (result.rowCount ?? 0) > 0;
+    return result.length > 0;
   }
 
   async listPosts(filters?: { status?: string; categoryId?: string; authorId?: string; limit?: number; offset?: number }): Promise<{ posts: Post[]; total: number }> {
@@ -259,7 +259,7 @@ export class PostgreSQLStorage implements IStorage {
 
   async deleteCategory(id: string): Promise<boolean> {
     const result = await db.delete(categories).where(eq(categories.id, id));
-    return (result.rowCount ?? 0) > 0;
+    return result.length > 0;
   }
 
   async listCategories(): Promise<Category[]> {
@@ -289,7 +289,7 @@ export class PostgreSQLStorage implements IStorage {
 
   async deleteTag(id: string): Promise<boolean> {
     const result = await db.delete(tags).where(eq(tags.id, id));
-    return (result.rowCount ?? 0) > 0;
+    return result.length > 0;
   }
 
   async listTags(): Promise<Tag[]> {
@@ -327,7 +327,7 @@ export class PostgreSQLStorage implements IStorage {
 
   async deleteMedia(id: string): Promise<boolean> {
     const result = await db.delete(media).where(eq(media.id, id));
-    return (result.rowCount ?? 0) > 0;
+    return result.length > 0;
   }
 
   async listMedia(limit = 50, offset = 0): Promise<{ media: Media[]; total: number }> {

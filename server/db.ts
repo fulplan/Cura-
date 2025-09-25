@@ -1,5 +1,5 @@
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
 import * as schema from "@shared/schema";
 
 if (!process.env.DATABASE_URL) {
@@ -8,6 +8,12 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Use HTTP driver for better compatibility in Replit environment
-const sql = neon(process.env.DATABASE_URL);
+// Use postgres-js driver for better SSL compatibility in Replit environment
+const sql = postgres(process.env.DATABASE_URL, {
+  ssl: process.env.NODE_ENV === 'production' ? 'require' : 'allow',
+  max: 20,
+  idle_timeout: 20,
+  connect_timeout: 60
+});
+
 export const db = drizzle(sql, { schema });
