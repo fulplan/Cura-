@@ -16,6 +16,8 @@ import SchedulingPage from "@/components/SchedulingPage";
 import TrashPage from "@/components/TrashPage";
 import LayoutManager from "@/components/LayoutManager";
 import UsersManager from "@/components/UsersManager";
+import AnalyticsPage from "@/components/AnalyticsPage";
+import SettingsPage from "@/components/SettingsPage";
 import NotFound from "@/pages/not-found";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import HeroBuilderPage from "@/components/HeroBuilderPage";
@@ -172,23 +174,20 @@ function Router() {
       
       <Route path="/analytics">
         <AdminLayout currentPage={getCurrentPage()}>
-          <div className="p-6">
-            <h1 className="text-3xl font-semibold mb-2">Analytics & Reports</h1>
-            <p className="text-muted-foreground">
-              Analytics dashboard coming soon.
-            </p>
-          </div>
+          <AnalyticsPage 
+            onExport={(format, period) => console.log("Export analytics:", format, period)}
+          />
         </AdminLayout>
       </Route>
       
       <Route path="/settings">
         <AdminLayout currentPage={getCurrentPage()}>
-          <div className="p-6">
-            <h1 className="text-3xl font-semibold mb-2">Settings</h1>
-            <p className="text-muted-foreground">
-              Settings panel coming soon.
-            </p>
-          </div>
+          <SettingsPage 
+            onSave={(settings) => {
+              const { smtpPassword, ...safeSettings } = settings;
+              console.log("Save settings (sensitive fields redacted):", safeSettings);
+            }}
+          />
         </AdminLayout>
       </Route>
       
