@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { Search, Plus, MoreHorizontal, Edit, Trash2, FolderPlus, Tag } from "lucide-react";
+import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory } from "@/hooks/useCategories";
+import { useTags, useCreateTag, useUpdateTag, useDeleteTag } from "@/hooks/useTags";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -72,31 +75,102 @@ export default function CategoriesPage({
   const [activeTab, setActiveTab] = useState("categories");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newItemData, setNewItemData] = useState({ name: "", description: "" });
+  
+  const { toast } = useToast();
+  const { data: categories = [], isLoading: categoriesLoading } = useCategories();
+  const { data: tags = [], isLoading: tagsLoading } = useTags();
+  const createCategoryMutation = useCreateCategory();
+  const updateCategoryMutation = useUpdateCategory();
+  const deleteCategoryMutation = useDeleteCategory();
+  const createTagMutation = useCreateTag();
+  const updateTagMutation = useUpdateTag();
+  const deleteTagMutation = useDeleteTag();
 
-  const filteredCategories = mockCategories.filter(category =>
+  const filteredCategories = categories.filter((category: any) =>
     category.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     category.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredTags = mockTags.filter(tag =>
+  const filteredTags = tags.filter((tag: any) =>
     tag.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleCreateItem = () => {
-    if (activeTab === "categories") {
-      onCreateCategory({
-        name: newItemData.name,
-        description: newItemData.description,
-        slug: newItemData.name.toLowerCase().replace(/\s+/g, "-")
-      });
-    } else {
-      onCreateTag({
-        name: newItemData.name,
-        slug: newItemData.name.toLowerCase().replace(/\s+/g, "-")
+  const handleCreateItem = async () => {
+    try {
+      const slug = newItemData.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+      
+      if (activeTab === "categories") {
+        await createCategoryMutation.mutateAsync({
+          name: newItemData.name,
+          description: newItemData.description,
+          slug
+        });
+        toast({
+          title: "Success",
+          description: "Category created successfully.",
+        });
+        onCreateCategory({
+          name: newItemData.name,
+          description: newItemData.description,
+          slug
+        });
+      } else {
+        await createTagMutation.mutateAsync({
+          name: newItemData.name,
+          slug
+        });
+        toast({
+          title: "Success",
+          description: "Tag created successfully.",
+        });
+        onCreateTag({
+          name: newItemData.name,
+          slug
+        });
+      }
+      setNewItemData({ name: "", description: "" });
+      setIsCreateDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || `Failed to create ${activeTab.slice(0, -1)}. Please try again.`,
+        variant: "destructive",
       });
     }
-    setNewItemData({ name: "", description: "" });
-    setIsCreateDialogOpen(false);
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    try {
+      await deleteCategoryMutation.mutateAsync(id);
+      toast({
+        title: "Success",
+        description: "Category deleted successfully.",
+      });
+      onDeleteCategory(id);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete category. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteTag = async (id: string) => {
+    try {
+      await deleteTagMutation.mutateAsync(id);
+      toast({
+        title: "Success",
+        description: "Tag deleted successfully.",
+      });
+      onDeleteTag(id);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete tag. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const CategoryCard = ({ category }: { category: Category }) => (
@@ -131,7 +205,7 @@ export default function CategoriesPage({
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuItem 
-                  onClick={() => onDeleteCategory(category.id)}
+                  onClick={() => handleDeleteCategory(category.id)}
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -181,7 +255,7 @@ export default function CategoriesPage({
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuItem 
-                  onClick={() => onDeleteTag(tag.id)}
+                  onClick={() => handleDeleteTag(tag.id)}
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />

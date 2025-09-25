@@ -3,6 +3,8 @@ import { useLocation } from "wouter";
 import { ArrowLeft, Save, Eye, MoreHorizontal, ImagePlus, Tag, Settings, Globe } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
 import { useToast } from "@/hooks/use-toast";
+import { useCategories } from "@/hooks/useCategories";
+import { useCreateTagsFromNames } from "@/hooks/useTags";
 import { insertPostSchema } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +51,9 @@ export default function NewPostPage({
   const editorRef = useRef<RichTextEditorRef>(null);
   const { toast } = useToast();
   const createPostMutation = useCreatePost();
-  const isLoading = externalLoading || createPostMutation.isPending;
+  const createTagsMutation = useCreateTagsFromNames();
+  const { data: categories = [] } = useCategories();
+  const isLoading = externalLoading || createPostMutation.isPending || createTagsMutation.isPending;
   const [formData, setFormData] = useState(() => initialData || {
     title: "",
     content: "",
@@ -111,7 +115,13 @@ export default function NewPostPage({
   const handleSave = async () => {
     try {
       if (onSave) {
-        onSave(formData);
+        // For edit mode, resolve tag names to IDs
+        if (formData.tags && formData.tags.length > 0) {
+          const tagIds = await createTagsMutation.mutateAsync(formData.tags);
+          onSave({ ...formData, tags: tagIds });
+        } else {
+          onSave(formData);
+        }
         return;
       }
       
@@ -130,11 +140,17 @@ export default function NewPostPage({
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '');
       
-      const postData = {
+      let postData = {
         ...formData,
         slug,
         status: "draft"
       };
+      
+      // Resolve tag names to IDs if tags exist
+      if (formData.tags && formData.tags.length > 0) {
+        const tagIds = await createTagsMutation.mutateAsync(formData.tags);
+        postData = { ...postData, tags: tagIds };
+      }
       
       await createPostMutation.mutateAsync(postData);
       
@@ -158,7 +174,13 @@ export default function NewPostPage({
   const handlePublish = async () => {
     try {
       if (onPublish) {
-        onPublish({ ...formData, status: "published" });
+        // For edit mode, resolve tag names to IDs
+        if (formData.tags && formData.tags.length > 0) {
+          const tagIds = await createTagsMutation.mutateAsync(formData.tags);
+          onPublish({ ...formData, status: "published", tags: tagIds });
+        } else {
+          onPublish({ ...formData, status: "published" });
+        }
         return;
       }
       
@@ -186,12 +208,18 @@ export default function NewPostPage({
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '');
       
-      const postData = {
+      let postData = {
         ...formData,
         slug,
         status: "published",
         publishedAt: new Date().toISOString()
       };
+      
+      // Resolve tag names to IDs if tags exist
+      if (formData.tags && formData.tags.length > 0) {
+        const tagIds = await createTagsMutation.mutateAsync(formData.tags);
+        postData = { ...postData, tags: tagIds };
+      }
       
       await createPostMutation.mutateAsync(postData);
       

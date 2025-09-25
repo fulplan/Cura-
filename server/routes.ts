@@ -12,6 +12,10 @@ import { z } from "zod";
 import session from "express-session";
 import MemoryStore from "memorystore";
 import { db } from "./db";
+import multer from "multer";
+import { join } from "path";
+import { mkdirSync, existsSync } from "fs";
+import { fileURLToPath } from "url";
 
 // Helper function for error responses with proper status codes
 const sendError = (res: any, status: number, message: string) => {
@@ -77,6 +81,48 @@ const requireEditor = (req: any, res: Response, next: NextFunction) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Ensure uploads directory exists
+  const uploadsDir = join(process.cwd(), 'public', 'uploads');
+  if (!existsSync(uploadsDir)) {
+    mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  // Configure multer for file uploads
+  const storage_multer = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadsDir);
+    },
+    filename: (req, file, cb) => {
+      // Generate unique filename with timestamp and random string
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const extension = file.originalname.split('.').pop();
+      cb(null, `${file.fieldname}-${uniqueSuffix}.${extension}`);
+    }
+  });
+
+  const upload = multer({
+    storage: storage_multer,
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB limit
+      files: 10 // Maximum 10 files per upload
+    },
+    fileFilter: (req, file, cb) => {
+      // Allow images, videos, audio, and documents
+      const allowedTypes = [
+        'image/', 'video/', 'audio/',
+        'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'text/plain', 'text/csv', 'application/json'
+      ];
+      
+      const isAllowed = allowedTypes.some(type => file.mimetype.startsWith(type));
+      if (isAllowed) {
+        cb(null, true);
+      } else {
+        cb(null, false);
+      }
+    }
+  });
+
   // Configure sessions with MemoryStore (suitable for serverless)
   const SessionStore = MemoryStore(session);
   
@@ -519,14 +565,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/posts/:id", requireEditor, async (req, res) => {
     try {
-      const success = await storage.deletePost(req.params.id);
+      const success = await storage.softDeletePost(req.params.id);
       if (!success) {
         return sendError(res, 404, "Post not found");
       }
-      res.json({ message: "Post deleted successfully" });
+      res.json({ message: "Post moved to trash" });
     } catch (error) {
       console.error("Delete post error:", error);
-      sendError(res, 500, "Failed to delete post");
+      sendError(res, 500, "Failed to move post to trash");
     }
   });
 
@@ -553,6 +599,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("List media error:", error);
       sendError(res, 500, "Failed to fetch media");
+    }
+  });
+
+  // File upload endpoint
+  app.post("/api/media/upload", requireAuth, upload.array('files', 10), async (req: any, res) => {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return sendError(res, 400, "No files uploaded");
+      }
+
+      const userId = req.session.user.id;
+      const uploadedMedia = [];
+
+      for (const file of req.files) {
+        const mediaData = {
+          filename: file.filename,
+          originalName: file.originalname,
+          mimeType: file.mimetype,
+          size: file.size,
+          url: `/uploads/${file.filename}`,
+          alt: req.body.alt || file.originalname,
+          caption: req.body.caption || ''
+        };
+
+        const media = await storage.createMedia(mediaData, userId);
+        uploadedMedia.push(media);
+      }
+
+      res.status(201).json({
+        message: "Files uploaded successfully",
+        files: uploadedMedia
+      });
+    } catch (error) {
+      console.error("File upload error:", error);
+      sendError(res, 500, "Failed to upload files");
     }
   });
 
@@ -678,6 +759,135 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return sendError(res, 409, "Username already exists");
       }
       sendError(res, 500, "Failed to create admin user");
+    }
+  });
+
+  // Trash/Recycle Routes
+  
+  // Get all deleted posts
+  app.get("/api/trash/posts", requireAuth, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const result = await storage.listDeletedPosts(limit, offset);
+      res.json(result);
+    } catch (error) {
+      console.error("List deleted posts error:", error);
+      sendError(res, 500, "Failed to fetch deleted posts");
+    }
+  });
+
+  // Restore a deleted post
+  app.post("/api/trash/posts/:id/restore", requireAuth, async (req, res) => {
+    try {
+      const restored = await storage.restorePost(req.params.id);
+      if (!restored) {
+        return sendError(res, 404, "Post not found");
+      }
+      res.json({ message: "Post restored successfully" });
+    } catch (error) {
+      console.error("Restore post error:", error);
+      sendError(res, 500, "Failed to restore post");
+    }
+  });
+
+  // Permanently delete a post (hard delete from trash)
+  app.delete("/api/posts/:id/permanent", requireEditor, async (req, res) => {
+    try {
+      const deleted = await storage.permanentDeletePost(req.params.id);
+      if (!deleted) {
+        return sendError(res, 404, "Post not found");
+      }
+      res.json({ message: "Post permanently deleted" });
+    } catch (error) {
+      console.error("Permanent delete post error:", error);
+      sendError(res, 500, "Failed to permanently delete post");
+    }
+  });
+
+  // Settings Routes
+  
+  // Get all settings (admin) or public settings (everyone)
+  app.get("/api/settings", async (req: any, res) => {
+    try {
+      const category = req.query.category as string;
+      const publicOnly = !req.session?.user || req.session.user.role !== "admin";
+      
+      const settings = await storage.getSettings(category, publicOnly);
+      res.json(settings);
+    } catch (error) {
+      console.error("Get settings error:", error);
+      handleDbError(error, res, "Failed to fetch settings");
+    }
+  });
+
+  // Get a specific setting
+  app.get("/api/settings/:key", async (req: any, res) => {
+    try {
+      const setting = await storage.getSetting(req.params.key);
+      if (!setting) {
+        return sendError(res, 404, "Setting not found");
+      }
+
+      // Check if user can access this setting
+      if (!setting.isPublic && (!req.session?.user || req.session.user.role !== "admin")) {
+        return sendError(res, 403, "Access denied");
+      }
+
+      res.json(setting);
+    } catch (error) {
+      console.error("Get setting error:", error);
+      handleDbError(error, res, "Failed to fetch setting");
+    }
+  });
+
+  // Create/Update a setting (admin only)
+  app.post("/api/settings", requireAdmin, async (req, res) => {
+    try {
+      const { key, value, category, isPublic, description } = req.body;
+      
+      if (!key || value === undefined) {
+        return sendError(res, 400, "Key and value are required");
+      }
+
+      const setting = await storage.setSetting(key, value, category, isPublic, description);
+      res.json(setting);
+    } catch (error) {
+      console.error("Set setting error:", error);
+      handleDbError(error, res, "Failed to save setting");
+    }
+  });
+
+  // Update a specific setting (admin only)
+  app.put("/api/settings/:key", requireAdmin, async (req, res) => {
+    try {
+      const updates = req.body;
+      const setting = await storage.updateSetting(req.params.key, updates);
+      
+      if (!setting) {
+        return sendError(res, 404, "Setting not found");
+      }
+
+      res.json(setting);
+    } catch (error) {
+      console.error("Update setting error:", error);
+      handleDbError(error, res, "Failed to update setting");
+    }
+  });
+
+  // Delete a setting (admin only)
+  app.delete("/api/settings/:key", requireAdmin, async (req, res) => {
+    try {
+      const deleted = await storage.deleteSetting(req.params.key);
+      
+      if (!deleted) {
+        return sendError(res, 404, "Setting not found");
+      }
+
+      res.json({ message: "Setting deleted successfully" });
+    } catch (error) {
+      console.error("Delete setting error:", error);
+      handleDbError(error, res, "Failed to delete setting");
     }
   });
 

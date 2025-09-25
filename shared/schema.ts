@@ -23,6 +23,7 @@ export const categories = pgTable("categories", {
   slug: text("slug").notNull().unique(),
   description: text("description"),
   color: text("color").default("#3b82f6"),
+  deletedAt: timestamp("deleted_at"), // Soft delete timestamp
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -33,6 +34,7 @@ export const tags = pgTable("tags", {
   name: text("name").notNull().unique(),
   slug: text("slug").notNull().unique(),
   color: text("color").default("#6b7280"),
+  deletedAt: timestamp("deleted_at"), // Soft delete timestamp
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -50,6 +52,7 @@ export const posts = pgTable("posts", {
   categoryId: varchar("category_id").references(() => categories.id),
   viewCount: integer("view_count").default(0),
   meta: json("meta"), // SEO and other metadata
+  deletedAt: timestamp("deleted_at"), // Soft delete timestamp
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -73,6 +76,7 @@ export const media = pgTable("media", {
   alt: text("alt"),
   caption: text("caption"),
   uploadedBy: varchar("uploaded_by").notNull().references(() => users.id),
+  deletedAt: timestamp("deleted_at"), // Soft delete timestamp
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -95,6 +99,18 @@ export const userSessions = pgTable("user_sessions", {
   sid: varchar("sid").primaryKey(),
   sess: json("sess").notNull(),
   expire: timestamp("expire").notNull(),
+});
+
+// Settings table for system configuration
+export const settings = pgTable("settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(),
+  value: json("value").notNull(),
+  category: text("category").default("general"), // general, email, social, appearance, etc
+  isPublic: boolean("is_public").default(false), // Whether setting can be accessed by frontend
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Insert schemas for forms
@@ -140,6 +156,14 @@ export const insertMediaSchema = createInsertSchema(media).pick({
   caption: true,
 });
 
+export const insertSettingSchema = createInsertSchema(settings).pick({
+  key: true,
+  value: true,
+  category: true,
+  isPublic: true,
+  description: true,
+});
+
 // Type exports
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -157,3 +181,6 @@ export type InsertMedia = z.infer<typeof insertMediaSchema>;
 export type Media = typeof media.$inferSelect;
 
 export type Analytics = typeof analytics.$inferSelect;
+
+export type InsertSetting = z.infer<typeof insertSettingSchema>;
+export type Setting = typeof settings.$inferSelect;
