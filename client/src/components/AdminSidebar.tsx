@@ -143,7 +143,7 @@ export default function AdminSidebar({ activeItem = "dashboard", onNavigate }: A
 
   const renderMenuItems = (items: any[], groupTitle?: string) => (
     <SidebarGroup>
-      {groupTitle && <SidebarGroupLabel>{groupTitle}</SidebarGroupLabel>}
+      {groupTitle && <SidebarGroupLabel className="type-overline text-muted-foreground">{groupTitle}</SidebarGroupLabel>}
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => (
@@ -154,7 +154,8 @@ export default function AdminSidebar({ activeItem = "dashboard", onNavigate }: A
                 data-testid={`sidebar-${item.url.replace(/\//g, '-').replace(/^-/, '')}`}
                 className={cn(
                   "w-full justify-start transition-all duration-200 hover:scale-[1.01] active:scale-[0.98]",
-                  "hover:shadow-sm active:shadow-none"
+                  "hover:shadow-sm active:shadow-none",
+                  isActiveRoute(item.url) && "bg-primary/10 text-primary font-medium"
                 )}
               >
                 <Link 
@@ -176,7 +177,10 @@ export default function AdminSidebar({ activeItem = "dashboard", onNavigate }: A
                   }}
                   className="flex items-center gap-2 w-full transition-colors duration-150 group"
                 >
-                  <item.icon className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" />
+                  <item.icon className={cn(
+                    "w-4 h-4 transition-all duration-200 group-hover:scale-110",
+                    isActiveRoute(item.url) ? "text-primary" : "text-muted-foreground"
+                  )} />
                   {state === "expanded" && (
                     <>
                       <span className="transition-opacity duration-200">{item.title}</span>
