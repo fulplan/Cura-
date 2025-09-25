@@ -32,7 +32,7 @@ function AuthenticatedRouter() {
 
   // Debug logging for route changes
   useEffect(() => {
-    if (import.meta.env?.DEV) {
+    if (import.meta.env.DEV) {
       console.log('🔄 [ROUTER] Route changed:', {
         location,
         timestamp: new Date().toISOString(),
@@ -240,11 +240,11 @@ function Router() {
 function App() {
   // Development mode logging
   useEffect(() => {
-    if (import.meta.env?.DEV) {
+    if (import.meta.env.DEV) {
       console.log('🚀 [APP] Penkora CMS starting...', {
         timestamp: new Date().toISOString(),
         version: '1.0.0',
-        environment: import.meta.env?.MODE || 'development'
+        environment: import.meta.env.MODE || 'development'
       });
     }
   }, []);
