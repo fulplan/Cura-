@@ -25,7 +25,7 @@ export default function AdminLayout({ children, currentPage = "dashboard" }: Adm
           />
           
           <main className="flex-1 overflow-auto bg-background">
-            <div className="max-w-7xl mx-auto px-4 md:px-6">
+            <div className="max-w-7xl mx-auto">
               {children}
             </div>
           </main>
