@@ -8,7 +8,12 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import AdminLayout from "@/components/AdminLayout";
 import Dashboard from "@/components/Dashboard";
 import AllPostsPage from "@/components/AllPostsPage";
-import MediaLibrary from "@/components/MediaLibrary";
+import NewPostPage from "@/components/NewPostPage";
+import CategoriesPage from "@/components/CategoriesPage";
+import MediaLibraryPage from "@/components/MediaLibraryPage";
+import UploadPage from "@/components/UploadPage";
+import SchedulingPage from "@/components/SchedulingPage";
+import TrashPage from "@/components/TrashPage";
 import LayoutManager from "@/components/LayoutManager";
 import UsersManager from "@/components/UsersManager";
 import NotFound from "@/pages/not-found";
@@ -71,33 +76,33 @@ function Router() {
       
       <Route path="/posts/new">
         <AdminLayout currentPage={getCurrentPage()}>
-          <div className="p-6">
-            <h1 className="text-3xl font-semibold mb-2">Create New Post</h1>
-            <p className="text-muted-foreground">
-              Post creation feature coming soon.
-            </p>
-          </div>
+          <NewPostPage 
+            onSave={(data) => console.log("Save post:", data)}
+            onPublish={(data) => console.log("Publish post:", data)}
+            onPreview={(data) => console.log("Preview post:", data)}
+          />
         </AdminLayout>
       </Route>
       
       {/* Media Routes */}
       <Route path="/media">
         <AdminLayout currentPage={getCurrentPage()}>
-          <MediaLibrary 
+          <MediaLibraryPage 
             onUpload={() => console.log("Upload files")}
-            onSelectFile={(file) => console.log("Selected file:", file)}
+            onSelect={(file) => console.log("Selected file:", file)}
+            onDelete={(ids) => console.log("Delete files:", ids)}
+            onDownload={(ids) => console.log("Download files:", ids)}
           />
         </AdminLayout>
       </Route>
       
       <Route path="/media/upload">
         <AdminLayout currentPage={getCurrentPage()}>
-          <div className="p-6">
-            <h1 className="text-3xl font-semibold mb-2">Upload Media</h1>
-            <p className="text-muted-foreground">
-              Media upload feature coming soon.
-            </p>
-          </div>
+          <UploadPage 
+            onUpload={(files, destination) => console.log("Upload files:", files, "to:", destination)}
+            onCancel={(fileId) => console.log("Cancel upload:", fileId)}
+            onRetry={(fileId) => console.log("Retry upload:", fileId)}
+          />
         </AdminLayout>
       </Route>
       
@@ -136,12 +141,14 @@ function Router() {
       {/* System Routes */}
       <Route path="/categories">
         <AdminLayout currentPage={getCurrentPage()}>
-          <div className="p-6">
-            <h1 className="text-3xl font-semibold mb-2">Categories & Tags</h1>
-            <p className="text-muted-foreground">
-              Categories management coming soon.
-            </p>
-          </div>
+          <CategoriesPage 
+            onCreateCategory={(data) => console.log("Create category:", data)}
+            onEditCategory={(id, data) => console.log("Edit category:", id, data)}
+            onDeleteCategory={(id) => console.log("Delete category:", id)}
+            onCreateTag={(data) => console.log("Create tag:", data)}
+            onEditTag={(id, data) => console.log("Edit tag:", id, data)}
+            onDeleteTag={(id) => console.log("Delete tag:", id)}
+          />
         </AdminLayout>
       </Route>
       
@@ -156,12 +163,12 @@ function Router() {
       
       <Route path="/schedule">
         <AdminLayout currentPage={getCurrentPage()}>
-          <div className="p-6">
-            <h1 className="text-3xl font-semibold mb-2">Scheduling</h1>
-            <p className="text-muted-foreground">
-              Scheduling feature coming soon.
-            </p>
-          </div>
+          <SchedulingPage 
+            onCreateSchedule={() => console.log("Create schedule")}
+            onEditSchedule={(id) => console.log("Edit schedule:", id)}
+            onDeleteSchedule={(id) => console.log("Delete schedule:", id)}
+            onPublishNow={(id) => console.log("Publish now:", id)}
+          />
         </AdminLayout>
       </Route>
       
@@ -189,12 +196,11 @@ function Router() {
       
       <Route path="/trash">
         <AdminLayout currentPage={getCurrentPage()}>
-          <div className="p-6">
-            <h1 className="text-3xl font-semibold mb-2">Trash & Archived</h1>
-            <p className="text-muted-foreground">
-              Trash management coming soon.
-            </p>
-          </div>
+          <TrashPage 
+            onRestore={(ids) => console.log("Restore items:", ids)}
+            onPermanentDelete={(ids) => console.log("Permanently delete:", ids)}
+            onEmptyTrash={() => console.log("Empty trash")}
+          />
         </AdminLayout>
       </Route>
       
