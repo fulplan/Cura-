@@ -21,6 +21,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "wouter";
@@ -196,6 +197,7 @@ export default function AdminSidebar({ activeItem = "dashboard", onNavigate }: A
         {renderMenuItems(mediaItems, "Media Library")}
         {renderMenuItems(systemItems, "System")}
       </SidebarContent>
+      <SidebarRail />
     </Sidebar>
   );
 }
