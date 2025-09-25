@@ -11,7 +11,7 @@ import {
 import { z } from "zod";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
-import { pool } from "./db";
+import { db } from "./db";
 
 // Helper function for error responses with proper status codes
 const sendError = (res: any, status: number, message: string) => {
@@ -87,7 +87,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(session({
     store: new PgSession({
-      pool: pool,
+      pool: db,
       tableName: "user_sessions"
     }),
     secret: process.env.SESSION_SECRET || "dev-secret-change-for-production",

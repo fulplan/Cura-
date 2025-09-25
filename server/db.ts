@@ -1,19 +1,6 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from "@shared/schema";
-
-// Configure WebSocket for Neon
-neonConfig.webSocketConstructor = ws;
-
-// For development in Replit environment
-if (process.env.NODE_ENV === 'development') {
-  // Disable SSL verification for development
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-  // Configure WebSocket settings for Replit environment
-  neonConfig.useSecureWebSocket = false;
-  neonConfig.pipelineConnect = false;
-}
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
@@ -21,5 +8,6 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle({ client: pool, schema });
+// Use HTTP driver for better compatibility in Replit environment
+const sql = neon(process.env.DATABASE_URL, { fetchConnectionCache: true });
+export const db = drizzle(sql, { schema });
