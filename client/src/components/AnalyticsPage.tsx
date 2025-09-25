@@ -23,15 +23,12 @@ import {
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   PieChart,
   Pie,
   Cell,
   XAxis,
   YAxis,
-  CartesianGrid,
-  ResponsiveContainer
+  CartesianGrid
 } from "recharts";
 
 interface MetricCard {
@@ -142,38 +139,38 @@ const trafficData = [
 ];
 
 const deviceData = [
-  { device: "Desktop", value: 64, count: 15736, color: "hsl(210, 85%, 55%)" },
-  { device: "Mobile", value: 28, count: 6889, color: "hsl(120, 75%, 45%)" },
-  { device: "Tablet", value: 8, count: 1966, color: "hsl(270, 75%, 55%)" }
+  { device: "Desktop", value: 64, count: 15736, fill: "var(--color-desktop)" },
+  { device: "Mobile", value: 28, count: 6889, fill: "var(--color-mobile)" },
+  { device: "Tablet", value: 8, count: 1966, fill: "var(--color-tablet)" }
 ];
 
 const trafficChartConfig = {
   views: {
     label: "Views",
-    color: "hsl(210, 85%, 55%)"
+    color: "hsl(var(--chart-1))"
   },
   visitors: {
-    label: "Visitors",
-    color: "hsl(120, 75%, 45%)"
+    label: "Visitors", 
+    color: "hsl(var(--chart-2))"
   },
   pages: {
     label: "Page Views",
-    color: "hsl(270, 75%, 55%)"
+    color: "hsl(var(--chart-3))"
   }
 };
 
 const deviceChartConfig = {
   desktop: {
     label: "Desktop",
-    color: "hsl(210, 85%, 55%)"
+    color: "hsl(var(--chart-1))"
   },
   mobile: {
     label: "Mobile",
-    color: "hsl(120, 75%, 45%)"
+    color: "hsl(var(--chart-2))"
   },
   tablet: {
     label: "Tablet",
-    color: "hsl(270, 75%, 55%)"
+    color: "hsl(var(--chart-3))"
   }
 };
 
@@ -322,7 +319,7 @@ export default function AnalyticsPage({
             {/* Desktop Filters */}
             <div className="hidden md:flex items-center gap-2">
               <Select value={timePeriod} onValueChange={setTimePeriod}>
-                <SelectTrigger className="w-36">
+                <SelectTrigger className="w-36" data-testid="time-period-desktop">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -334,7 +331,7 @@ export default function AnalyticsPage({
               </Select>
               
               <Select value={contentFilter} onValueChange={setContentFilter}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-32" data-testid="content-filter-desktop">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -380,6 +377,7 @@ export default function AnalyticsPage({
                     content={<ChartTooltipContent />}
                     cursor={{ stroke: "hsl(var(--muted-foreground))", strokeWidth: 1 }}
                   />
+                  <ChartLegend content={<ChartLegendContent />} />
                   <Area
                     type="monotone"
                     dataKey="views"
@@ -417,7 +415,7 @@ export default function AnalyticsPage({
                     return (
                       <div key={device.device} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4" style={{ color: device.color }} />
+                          <Icon className="h-4 w-4" style={{ color: device.fill }} />
                           <span className="text-sm font-medium">{device.device}</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -426,7 +424,7 @@ export default function AnalyticsPage({
                               className="h-full rounded-full" 
                               style={{ 
                                 width: `${device.value}%`, 
-                                backgroundColor: device.color 
+                                backgroundColor: device.fill 
                               }}
                             />
                           </div>
@@ -449,13 +447,10 @@ export default function AnalyticsPage({
                         cy="50%"
                         outerRadius={70}
                         dataKey="value"
+                        nameKey="device"
                         label={({ device, value }) => `${device}: ${value}%`}
                         labelLine={false}
-                      >
-                        {deviceData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
+                      />
                       <ChartTooltip 
                         content={<ChartTooltipContent />}
                       />

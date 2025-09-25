@@ -1,14 +1,16 @@
-import { useState } from "react";
-import { Save, Globe, Shield, Bell, Database, Palette, Users, Mail } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Save, Globe, Shield, Bell, Database, Palette, Users, Mail, CheckCircle, AlertCircle, Info, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   Page, 
   PageHeader, 
@@ -27,6 +29,9 @@ export default function SettingsPage({
 }: SettingsPageProps) {
   const [activeTab, setActiveTab] = useState("general");
   const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [settings, setSettings] = useState({
     // General
     siteName: "Penkora CMS",
@@ -72,12 +77,80 @@ export default function SettingsPage({
   const updateSetting = (key: string, value: any) => {
     setSettings(prev => ({ ...prev, [key]: value }));
     setIsDirty(true);
+    setSaveSuccess(false);
+    
+    // Clear validation error for this field
+    if (validationErrors[key]) {
+      setValidationErrors(prev => {
+        const { [key]: removed, ...rest } = prev;
+        return rest;
+      });
+    }
   };
 
-  const handleSave = () => {
-    onSave(settings);
-    setIsDirty(false);
+  const validateSettings = () => {
+    const errors: Record<string, string> = {};
+    
+    if (!settings.siteName.trim()) {
+      errors.siteName = "Site name is required";
+    }
+    
+    if (!settings.siteUrl.trim()) {
+      errors.siteUrl = "Site URL is required";
+    } else if (!/^https?:\/\/.+/.test(settings.siteUrl)) {
+      errors.siteUrl = "Please enter a valid URL (starting with http:// or https://)";
+    }
+    
+    if (!settings.fromEmail.trim()) {
+      errors.fromEmail = "From email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.fromEmail)) {
+      errors.fromEmail = "Please enter a valid email address";
+    }
+    
+    if (parseInt(settings.passwordMinLength) < 8) {
+      errors.passwordMinLength = "Minimum password length should be at least 8 characters";
+    }
+    
+    return errors;
   };
+
+  const handleSave = async () => {
+    const errors = validateSettings();
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      await onSave(settings);
+      setIsDirty(false);
+      setSaveSuccess(true);
+      setValidationErrors({});
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error("Failed to save settings:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Auto-save functionality (optional)
+  useEffect(() => {
+    if (!isDirty) return;
+    
+    const autoSaveTimer = setTimeout(() => {
+      const errors = validateSettings();
+      if (Object.keys(errors).length === 0) {
+        // Auto-save only if no validation errors
+        // handleSave(); // Uncomment to enable auto-save
+      }
+    }, 2000);
+    
+    return () => clearTimeout(autoSaveTimer);
+  }, [settings, isDirty]);
 
   const GeneralTab = () => (
     <div className="space-y-6">
@@ -87,16 +160,30 @@ export default function SettingsPage({
             <Globe className="h-4 w-4" />
             Site Information
           </CardTitle>
+          <CardDescription>
+            Configure your site's basic information and regional settings
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="siteName">Site Name</Label>
+            <Label htmlFor="siteName" className={validationErrors.siteName ? "text-destructive" : ""}>
+              Site Name
+              <span className="text-destructive ml-1">*</span>
+            </Label>
             <Input
               id="siteName"
               value={settings.siteName}
               onChange={(e) => updateSetting("siteName", e.target.value)}
               data-testid="site-name"
+              className={validationErrors.siteName ? "border-destructive focus:border-destructive" : ""}
+              placeholder="Enter your site name"
             />
+            {validationErrors.siteName && (
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                {validationErrors.siteName}
+              </p>
+            )}
           </div>
           
           <div className="space-y-2">
@@ -111,14 +198,25 @@ export default function SettingsPage({
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="siteUrl">Site URL</Label>
+            <Label htmlFor="siteUrl" className={validationErrors.siteUrl ? "text-destructive" : ""}>
+              Site URL
+              <span className="text-destructive ml-1">*</span>
+            </Label>
             <Input
               id="siteUrl"
               type="url"
               value={settings.siteUrl}
               onChange={(e) => updateSetting("siteUrl", e.target.value)}
               data-testid="site-url"
+              className={validationErrors.siteUrl ? "border-destructive focus:border-destructive" : ""}
+              placeholder="https://yoursite.com"
             />
+            {validationErrors.siteUrl && (
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                {validationErrors.siteUrl}
+              </p>
+            )}
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -197,14 +295,25 @@ export default function SettingsPage({
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="passwordMinLength">Minimum Password Length</Label>
+              <Label htmlFor="passwordMinLength" className={validationErrors.passwordMinLength ? "text-destructive" : ""}>
+                Minimum Password Length
+              </Label>
               <Input
                 id="passwordMinLength"
                 type="number"
+                min="8"
+                max="64"
                 value={settings.passwordMinLength}
                 onChange={(e) => updateSetting("passwordMinLength", e.target.value)}
                 data-testid="password-min-length"
+                className={validationErrors.passwordMinLength ? "border-destructive focus:border-destructive" : ""}
               />
+              {validationErrors.passwordMinLength && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {validationErrors.passwordMinLength}
+                </p>
+              )}
             </div>
           </div>
           
@@ -390,14 +499,25 @@ export default function SettingsPage({
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="fromEmail">From Email</Label>
+              <Label htmlFor="fromEmail" className={validationErrors.fromEmail ? "text-destructive" : ""}>
+                From Email
+                <span className="text-destructive ml-1">*</span>
+              </Label>
               <Input
                 id="fromEmail"
                 type="email"
                 value={settings.fromEmail}
                 onChange={(e) => updateSetting("fromEmail", e.target.value)}
                 data-testid="from-email"
+                className={validationErrors.fromEmail ? "border-destructive focus:border-destructive" : ""}
+                placeholder="noreply@yoursite.com"
               />
+              {validationErrors.fromEmail && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {validationErrors.fromEmail}
+                </p>
+              )}
             </div>
             
             <div className="space-y-2">
@@ -424,10 +544,24 @@ export default function SettingsPage({
               Settings
             </PageTitle>
             <div className="hidden md:flex items-center gap-2">
+              {saveSuccess && (
+                <div className="flex items-center gap-2 text-green-600 text-sm">
+                  <CheckCircle className="h-4 w-4" />
+                  Settings saved successfully
+                </div>
+              )}
               {isDirty && (
-                <Button onClick={handleSave} data-testid="save-settings-desktop">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
+                <Button 
+                  onClick={handleSave} 
+                  data-testid="save-settings-desktop"
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  {isSaving ? "Saving..." : "Save Changes"}
                 </Button>
               )}
             </div>
@@ -507,13 +641,34 @@ export default function SettingsPage({
         </div>
       </PageBody>
 
-      {/* Mobile Action Bar */}
-      <ActionBar show={isDirty}>
-        <span className="text-sm">Unsaved changes</span>
-        <Button onClick={handleSave} size="sm" data-testid="save-settings-mobile">
-          <Save className="h-4 w-4 mr-1" />
-          Save
-        </Button>
+      {/* Mobile Action Bar - Enhanced */}
+      <ActionBar show={isDirty || saveSuccess}>
+        {saveSuccess ? (
+          <div className="flex items-center gap-2 text-green-600">
+            <CheckCircle className="h-4 w-4" />
+            <span className="text-sm">Settings saved successfully</span>
+          </div>
+        ) : (
+          <>
+            <span className="text-sm flex items-center gap-2">
+              <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+              Unsaved changes
+            </span>
+            <Button 
+              onClick={handleSave} 
+              size="sm" 
+              data-testid="save-settings-mobile"
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-1" />
+              )}
+              {isSaving ? "Saving..." : "Save"}
+            </Button>
+          </>
+        )}
       </ActionBar>
     </Page>
   );
