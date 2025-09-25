@@ -423,7 +423,7 @@ export default function AllPostsPage({
               </p>
             </div>
           ) : (
-            <EmptyStates.Posts />
+            <EmptyStates.Posts onCreatePost={onCreatePost} />
           )
         ) : (
           <>

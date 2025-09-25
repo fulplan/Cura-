@@ -29,7 +29,7 @@ function Router() {
 
   // Debug logging for route changes
   useEffect(() => {
-    if (import.meta.env.DEV) {
+    if (import.meta.env && import.meta.env.DEV) {
       console.log('🔄 [ROUTER] Route changed:', {
         location,
         timestamp: new Date().toISOString(),
@@ -81,11 +81,7 @@ function Router() {
       
       <Route path="/posts/new">
         <AdminLayout currentPage={getCurrentPage()}>
-          <NewPostPage 
-            onSave={(data) => console.log("Save post:", data)}
-            onPublish={(data) => console.log("Publish post:", data)}
-            onPreview={(data) => console.log("Preview post:", data)}
-          />
+          <NewPostPage />
         </AdminLayout>
       </Route>
       
@@ -217,11 +213,11 @@ function Router() {
 function App() {
   // Development mode logging
   useEffect(() => {
-    if (import.meta.env.DEV) {
+    if (import.meta.env && import.meta.env.DEV) {
       console.log('🚀 [APP] Penkora CMS starting...', {
         timestamp: new Date().toISOString(),
         version: '1.0.0',
-        environment: import.meta.env.MODE
+        environment: import.meta.env ? import.meta.env.MODE : 'development'
       });
     }
   }, []);

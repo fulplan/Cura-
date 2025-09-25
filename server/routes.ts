@@ -10,7 +10,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import session from "express-session";
-import ConnectPgSimple from "connect-pg-simple";
+import MemoryStore from "memorystore";
 import { db } from "./db";
 
 // Helper function for error responses with proper status codes
@@ -77,8 +77,8 @@ const requireEditor = (req: any, res: Response, next: NextFunction) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Configure sessions with PostgreSQL store
-  const PgSession = ConnectPgSimple(session);
+  // Configure sessions with MemoryStore (suitable for serverless)
+  const SessionStore = MemoryStore(session);
   
   // Require session secret in production
   if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
@@ -86,9 +86,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   app.use(session({
-    store: new PgSession({
-      pool: db,
-      tableName: "user_sessions"
+    store: new SessionStore({
+      checkPeriod: 86400000 // prune expired entries every 24h
     }),
     secret: process.env.SESSION_SECRET || "dev-secret-change-for-production",
     resave: false,

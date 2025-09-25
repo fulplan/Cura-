@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { ArrowLeft, Save, Eye, MoreHorizontal, ImagePlus, Tag, Settings, Globe } from "lucide-react";
+import { useCreatePost } from "@/hooks/usePosts";
+import { useToast } from "@/hooks/use-toast";
+import { insertPostSchema } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,14 +38,17 @@ interface NewPostPageProps {
 export default function NewPostPage({ 
   mode = 'create',
   initialData,
-  isLoading = false,
-  onSave = (data) => console.log("Save post:", data),
-  onPublish = (data) => console.log("Publish post:", data),
+  isLoading: externalLoading = false,
+  onSave,
+  onPublish,
   onPreview = (data) => console.log("Preview post:", data)
 }: NewPostPageProps) {
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("content");
   const editorRef = useRef<RichTextEditorRef>(null);
+  const { toast } = useToast();
+  const createPostMutation = useCreatePost();
+  const isLoading = externalLoading || createPostMutation.isPending;
   const [formData, setFormData] = useState(() => initialData || {
     title: "",
     content: "",
@@ -69,7 +75,7 @@ export default function NewPostPage({
   const [isDirty, setIsDirty] = useState(false);
 
   const updateField = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev: any) => ({ ...prev, [field]: value }));
     setIsDirty(true);
   };
 
@@ -81,20 +87,110 @@ export default function NewPostPage({
   };
 
   const removeTag = (tagToRemove: string) => {
-    updateField("tags", formData.tags.filter(tag => tag !== tagToRemove));
+    updateField("tags", formData.tags.filter((tag: string) => tag !== tagToRemove));
   };
 
-  const handleSave = () => {
-    onSave(formData);
-    if (!isLoading) {
+  const handleSave = async () => {
+    try {
+      if (onSave) {
+        onSave(formData);
+        return;
+      }
+      
+      // Validate required fields
+      if (!formData.title.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Post title is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Create slug from title if not provided
+      const slug = formData.title.toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+      
+      const postData = {
+        ...formData,
+        slug,
+        status: "draft"
+      };
+      
+      await createPostMutation.mutateAsync(postData);
+      
+      toast({
+        title: "Success",
+        description: "Post saved as draft successfully.",
+      });
+      
       setIsDirty(false);
+      // Navigate back to posts list
+      setLocation("/posts");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save post. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
-  const handlePublish = () => {
-    onPublish({ ...formData, status: "published" });
-    if (!isLoading) {
+  const handlePublish = async () => {
+    try {
+      if (onPublish) {
+        onPublish({ ...formData, status: "published" });
+        return;
+      }
+      
+      // Validate required fields
+      if (!formData.title.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Post title is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (!formData.content.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Post content is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Create slug from title if not provided
+      const slug = formData.title.toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+      
+      const postData = {
+        ...formData,
+        slug,
+        status: "published",
+        publishedAt: new Date().toISOString()
+      };
+      
+      await createPostMutation.mutateAsync(postData);
+      
+      toast({
+        title: "Success",
+        description: "Post published successfully!",
+      });
+      
       setIsDirty(false);
+      // Navigate back to posts list
+      setLocation("/posts");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to publish post. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -193,7 +289,7 @@ export default function NewPostPage({
           </div>
           {formData.tags.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-2">
-              {formData.tags.map(tag => (
+              {formData.tags.map((tag: string) => (
                 <Badge 
                   key={tag} 
                   variant="secondary" 

@@ -114,21 +114,20 @@ export class PostgreSQLStorage implements IStorage {
 
   // Posts
   async createPost(post: InsertPost, authorId: string, tagIds?: string[]): Promise<Post> {
-    return await db.transaction(async (tx) => {
-      const result = await tx.insert(posts).values({ ...post, authorId }).returning();
-      const createdPost = result[0];
+    // Create the post first
+    const result = await db.insert(posts).values({ ...post, authorId }).returning();
+    const createdPost = result[0];
 
-      // Associate tags if provided
-      if (tagIds && tagIds.length > 0) {
-        const tagAssociations = tagIds.map(tagId => ({
-          postId: createdPost.id,
-          tagId
-        }));
-        await tx.insert(postTags).values(tagAssociations);
-      }
+    // Associate tags if provided (Neon HTTP driver doesn't support transactions)
+    if (tagIds && tagIds.length > 0) {
+      const tagAssociations = tagIds.map(tagId => ({
+        postId: createdPost.id,
+        tagId
+      }));
+      await db.insert(postTags).values(tagAssociations);
+    }
 
-      return createdPost;
-    });
+    return createdPost;
   }
 
   async getPost(id: string): Promise<Post | undefined> {
@@ -142,25 +141,24 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async updatePost(id: string, post: Partial<InsertPost>, tagIds?: string[]): Promise<Post | undefined> {
-    return await db.transaction(async (tx) => {
-      const result = await tx.update(posts).set({ ...post, updatedAt: new Date() }).where(eq(posts.id, id)).returning();
+    // Update the post first
+    const result = await db.update(posts).set({ ...post, updatedAt: new Date() }).where(eq(posts.id, id)).returning();
+    
+    if (result.length > 0 && tagIds !== undefined) {
+      // Remove existing tag associations (Neon HTTP driver doesn't support transactions)
+      await db.delete(postTags).where(eq(postTags.postId, id));
       
-      if (result.length > 0 && tagIds !== undefined) {
-        // Remove existing tag associations
-        await tx.delete(postTags).where(eq(postTags.postId, id));
-        
-        // Add new tag associations
-        if (tagIds.length > 0) {
-          const tagAssociations = tagIds.map(tagId => ({
-            postId: id,
-            tagId
-          }));
-          await tx.insert(postTags).values(tagAssociations);
-        }
+      // Add new tag associations
+      if (tagIds.length > 0) {
+        const tagAssociations = tagIds.map(tagId => ({
+          postId: id,
+          tagId
+        }));
+        await db.insert(postTags).values(tagAssociations);
       }
+    }
 
-      return result[0];
-    });
+    return result[0];
   }
 
   async deletePost(id: string): Promise<boolean> {
