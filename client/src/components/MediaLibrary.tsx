@@ -29,6 +29,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useMedia, useDeleteMedia } from "@/hooks/useMedia";
+import { useToast } from "@/hooks/use-toast";
+import { LoadingCard } from "@/components/ui/loading";
 
 interface MediaLibraryProps {
   onUpload?: () => void;
@@ -40,59 +43,50 @@ export default function MediaLibrary({ onUpload, onSelectFile }: MediaLibraryPro
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [typeFilter, setTypeFilter] = useState("all");
 
-  // TODO: Remove mock data
-  const mediaFiles = [
-    {
-      id: "1",
-      name: "hero-image.jpg",
-      type: "image",
-      size: "2.4 MB",
-      uploadDate: "2024-01-15",
-      dimensions: "1920x1080",
-      thumbnail: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=400&h=300&fit=crop",
-      used: true
-    },
-    {
-      id: "2",
-      name: "presentation.pdf",
-      type: "document",
-      size: "5.1 MB", 
-      uploadDate: "2024-01-14",
-      dimensions: null,
-      thumbnail: null,
-      used: false
-    },
-    {
-      id: "3",
-      name: "demo-video.mp4",
-      type: "video",
-      size: "45.2 MB",
-      uploadDate: "2024-01-12",
-      dimensions: "1920x1080",
-      thumbnail: "https://images.unsplash.com/photo-1551434678-e076c223a692?w=400&h=300&fit=crop",
-      used: true
-    },
-    {
-      id: "4",
-      name: "profile-photo.png", 
-      type: "image",
-      size: "856 KB",
-      uploadDate: "2024-01-10",
-      dimensions: "512x512",
-      thumbnail: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=300&fit=crop",
-      used: false
-    },
-    {
-      id: "5",
-      name: "screenshot-1.png",
-      type: "image", 
-      size: "1.2 MB",
-      uploadDate: "2024-01-08",
-      dimensions: "1440x900",
-      thumbnail: "https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?w=400&h=300&fit=crop",
-      used: true
+  const { toast } = useToast();
+  
+  // Fetch real media data
+  const { data: mediaData, isLoading, error } = useMedia(50, 0);
+  const deleteMutation = useDeleteMedia();
+
+  // Transform API data to match component expectations
+  const mediaFiles = mediaData?.map((media: any) => ({
+    id: media.id,
+    name: media.filename,
+    type: media.mimeType.startsWith('image/') ? 'image' : 
+          media.mimeType.startsWith('video/') ? 'video' : 'document',
+    size: formatFileSize(media.size),
+    uploadDate: new Date(media.createdAt).toLocaleDateString(),
+    dimensions: null, // Could extract from metadata
+    thumbnail: media.mimeType.startsWith('image/') ? media.url : null,
+    used: false // Could track usage
+  })) || [];
+
+  // Handle media deletion
+  const handleDeleteMedia = async (mediaId: string) => {
+    try {
+      await deleteMutation.mutateAsync(mediaId);
+      toast({
+        title: "Media deleted",
+        description: "The file has been successfully deleted.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete the file. Please try again.",
+        variant: "destructive",
+      });
     }
-  ];
+  };
+
+  // Helper function to format file size
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  };
 
   const getFileIcon = (type: string) => {
     switch (type) {
@@ -112,6 +106,26 @@ export default function MediaLibrary({ onUpload, onSelectFile }: MediaLibraryPro
     }
   };
 
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <LoadingCard key={i} className="aspect-square" />
+        ))}
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    toast({
+      title: "Connection Error",
+      description: "Unable to load media files from server.",
+      variant: "destructive",
+    });
+  }
+
   const filteredFiles = mediaFiles.filter(file => {
     const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = typeFilter === "all" || file.type === typeFilter;
@@ -128,7 +142,6 @@ export default function MediaLibrary({ onUpload, onSelectFile }: MediaLibraryPro
             className="hover-elevate cursor-pointer"
             onClick={() => {
               onSelectFile?.(file);
-              console.log("Selected file:", file.name);
             }}
             data-testid={`file-card-${file.id}`}
           >
@@ -196,7 +209,6 @@ export default function MediaLibrary({ onUpload, onSelectFile }: MediaLibraryPro
             className="hover-elevate cursor-pointer"
             onClick={() => {
               onSelectFile?.(file);
-              console.log("Selected file:", file.name);
             }}
             data-testid={`file-row-${file.id}`}
           >

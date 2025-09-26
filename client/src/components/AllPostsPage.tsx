@@ -71,10 +71,10 @@ const transformPostData = (apiPost: any): PostWithDetails => ({
 });
 
 export default function AllPostsPage({ 
-  onCreatePost = () => console.log("Create post"),
-  onEditPost = (id) => console.log("Edit post:", id),
-  onPreviewPost = (id) => console.log("Preview post:", id),
-  onDeletePost = (id) => console.log("Delete post:", id)
+  onCreatePost,
+  onEditPost,
+  onPreviewPost,
+  onDeletePost
 }: AllPostsPageProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -93,14 +93,14 @@ export default function AllPostsPage({
     if (error && !postsData) {
       toast({
         title: "Connection Error",
-        description: "Unable to load posts from server. Showing offline data.",
+        description: "Unable to load posts from server.",
         variant: "destructive",
       });
     }
   }, [error, postsData, toast]);
   
-  // Use real data if available, otherwise fall back to mock data
-  const rawPosts = postsData || mockPosts;
+  // Use real data if available, show loading state or empty state appropriately
+  const rawPosts = postsData || [];
   const posts: PostWithDetails[] = rawPosts.map(transformPostData);
 
   // Filter posts based on search and filters
@@ -121,7 +121,7 @@ export default function AllPostsPage({
         title: "Post deleted",
         description: "The post has been successfully deleted.",
       });
-      onDeletePost(postId);
+      onDeletePost?.(postId);
     } catch (error) {
       toast({
         title: "Error",
@@ -182,11 +182,11 @@ export default function AllPostsPage({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEditPost(post.id)}>
+              <DropdownMenuItem onClick={() => onEditPost?.(post.id)}>
                 <Edit className="h-4 w-4 mr-2" />
                 Edit
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onPreviewPost(post.id)}>
+              <DropdownMenuItem onClick={() => onPreviewPost?.(post.id)}>
                 <Eye className="h-4 w-4 mr-2" />
                 Preview
               </DropdownMenuItem>
@@ -266,11 +266,11 @@ export default function AllPostsPage({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onEditPost(post.id)}>
+            <DropdownMenuItem onClick={() => onEditPost?.(post.id)}>
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onPreviewPost(post.id)}>
+            <DropdownMenuItem onClick={() => onPreviewPost?.(post.id)}>
               <Eye className="h-4 w-4 mr-2" />
               Preview
             </DropdownMenuItem>

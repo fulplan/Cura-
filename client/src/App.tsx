@@ -32,7 +32,7 @@ function AuthenticatedRouter() {
 
   // Debug logging for route changes
   useEffect(() => {
-    if (import.meta.env.DEV) {
+    if (import.meta.env.MODE === 'development') {
       console.log('🔄 [ROUTER] Route changed:', {
         location,
         timestamp: new Date().toISOString(),
@@ -76,8 +76,14 @@ function AuthenticatedRouter() {
           <AllPostsPage 
             onCreatePost={() => setLocation("/posts/new")}
             onEditPost={(id) => setLocation(`/posts/edit/${id}`)}
-            onPreviewPost={(id) => console.log("Preview post:", id)}
-            onDeletePost={(id) => console.log("Delete post:", id)}
+            onPreviewPost={(id) => {
+              // Open post in new tab for preview
+              window.open(`/posts/${id}/preview`, '_blank');
+            }}
+            onDeletePost={(id) => {
+              // Delete is handled internally by AllPostsPage component
+              // No additional action needed as toast notifications are shown there
+            }}
           />
         </AdminLayout>
       </Route>
@@ -98,10 +104,17 @@ function AuthenticatedRouter() {
       <Route path="/media">
         <AdminLayout currentPage={getCurrentPage()}>
           <MediaLibraryPage 
-            onUpload={() => console.log("Upload files")}
-            onSelect={(file) => console.log("Selected file:", file)}
-            onDelete={(ids) => console.log("Delete files:", ids)}
-            onDownload={(ids) => console.log("Download files:", ids)}
+            onUpload={() => setLocation("/media/upload")}
+            onSelect={(file) => {
+              // File selection handled internally by MediaLibrary component
+            }}
+            onDelete={(ids) => {
+              // Delete handled internally by MediaLibrary component with toast feedback
+            }}
+            onDownload={(ids) => {
+              // Download functionality to be implemented
+              console.log("Download files:", ids);
+            }}
           />
         </AdminLayout>
       </Route>
@@ -240,11 +253,11 @@ function Router() {
 function App() {
   // Development mode logging
   useEffect(() => {
-    if (import.meta.env.DEV) {
+    if (import.meta.env.MODE === 'development') {
       console.log('🚀 [APP] Penkora CMS starting...', {
         timestamp: new Date().toISOString(),
         version: '1.0.0',
-        environment: import.meta.env.MODE || 'development'
+        environment: import.meta.env.MODE
       });
     }
   }, []);
