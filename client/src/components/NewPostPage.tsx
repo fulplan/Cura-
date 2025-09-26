@@ -143,8 +143,12 @@ export default function NewPostPage({
       let postData = {
         ...formData,
         slug,
-        status: "draft"
+        status: "draft",
+        categoryId: formData.category // Map category to categoryId
       };
+      
+      // Remove the old category field
+      delete (postData as any).category;
       
       // Resolve tag names to IDs if tags exist
       if (formData.tags && formData.tags.length > 0) {
@@ -174,12 +178,19 @@ export default function NewPostPage({
   const handlePublish = async () => {
     try {
       if (onPublish) {
-        // For edit mode, resolve tag names to IDs
+        // For edit mode, resolve tag names to IDs and map category
+        let publishData = { 
+          ...formData, 
+          status: "published",
+          categoryId: formData.category
+        };
+        delete (publishData as any).category;
+        
         if (formData.tags && formData.tags.length > 0) {
           const tagIds = await createTagsMutation.mutateAsync(formData.tags);
-          onPublish({ ...formData, status: "published", tags: tagIds });
+          onPublish({ ...publishData, tags: tagIds });
         } else {
-          onPublish({ ...formData, status: "published" });
+          onPublish(publishData);
         }
         return;
       }
@@ -212,8 +223,12 @@ export default function NewPostPage({
         ...formData,
         slug,
         status: "published",
-        publishedAt: new Date().toISOString()
+        publishedAt: new Date().toISOString(),
+        categoryId: formData.category // Map category to categoryId
       };
+      
+      // Remove the old category field
+      delete (postData as any).category;
       
       // Resolve tag names to IDs if tags exist
       if (formData.tags && formData.tags.length > 0) {
@@ -312,10 +327,11 @@ export default function NewPostPage({
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="development">Development</SelectItem>
-              <SelectItem value="design">Design</SelectItem>
-              <SelectItem value="technology">Technology</SelectItem>
-              <SelectItem value="tutorial">Tutorial</SelectItem>
+              {categories.map((category: any) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

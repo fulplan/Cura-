@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import React from "react";
 import { Link } from "wouter";
-import { Search, Filter, MoreHorizontal, Edit, Eye, Trash2, Plus, Grid, List } from "lucide-react";
+import { Search, Filter, MoreHorizontal, Edit, Eye, Trash2, Plus, Grid, List, FileText } from "lucide-react";
 import { usePostsWithDetails, useDeletePost, mockPosts } from "@/hooks/usePosts";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import {
   FAB,
   FilterSheet
 } from "@/components/ui/page";
-import { EmptyStates } from "@/components/ui/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingCard, LoadingTable } from "@/components/ui/loading";
 
 interface PostWithDetails {
@@ -423,7 +423,15 @@ export default function AllPostsPage({
               </p>
             </div>
           ) : (
-            <EmptyStates.Posts onCreatePost={onCreatePost} />
+            <EmptyState
+              icon={<FileText className="h-8 w-8 text-muted-foreground" />}
+              title="No posts yet"
+              description="Create your first post to get started with your content."
+              action={onCreatePost ? {
+                label: "Create Post",
+                onClick: onCreatePost
+              } : undefined}
+            />
           )
         ) : (
           <>

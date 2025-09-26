@@ -1,5 +1,9 @@
 import { useState, useRef } from "react";
-import { Upload, X, FileIcon, Image, Video, FileText, Check, AlertCircle } from "lucide-react";
+import { useLocation } from "wouter";
+import { Upload, X, FileIcon, Image, Video, FileText, Check, AlertCircle, ArrowLeft } from "lucide-react";
+import { useUploadFiles } from "@/hooks/useMedia";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -23,20 +27,21 @@ interface UploadFile {
 }
 
 interface UploadPageProps {
-  onUpload?: (files: File[], destination?: string) => void;
-  onCancel?: (fileId: string) => void;
-  onRetry?: (fileId: string) => void;
+  onUploadComplete?: () => void;
 }
 
 export default function UploadPage({ 
-  onUpload = (files, destination) => console.log("Upload files:", files, "to:", destination),
-  onCancel = (fileId) => console.log("Cancel upload:", fileId),
-  onRetry = (fileId) => console.log("Retry upload:", fileId)
+  onUploadComplete
 }: UploadPageProps) {
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
   const [destination, setDestination] = useState("media-library");
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const uploadMutation = useUploadFiles();
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -69,54 +74,76 @@ export default function UploadPage({
     }));
     
     setUploadFiles(prev => [...prev, ...newUploadFiles]);
-    
-    // Simulate upload process
-    newUploadFiles.forEach(uploadFile => {
-      simulateUpload(uploadFile.id);
-    });
   };
 
-  const simulateUpload = (fileId: string) => {
-    setUploadFiles(prev => prev.map(f => 
-      f.id === fileId ? { ...f, status: "uploading" } : f
-    ));
+  const startUpload = async () => {
+    const pendingFiles = uploadFiles.filter(f => f.status === "pending" || f.status === "error");
+    
+    if (pendingFiles.length === 0) return;
 
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 20;
-      
-      if (progress >= 100) {
-        clearInterval(interval);
-        // Simulate occasional failures
-        const success = Math.random() > 0.1;
-        
-        setUploadFiles(prev => prev.map(f => 
-          f.id === fileId ? { 
-            ...f, 
-            progress: 100, 
-            status: success ? "completed" : "error",
-            error: success ? undefined : "Failed to upload file"
-          } : f
-        ));
-      } else {
-        setUploadFiles(prev => prev.map(f => 
-          f.id === fileId ? { ...f, progress } : f
-        ));
-      }
-    }, 100);
+    setIsUploading(true);
+
+    try {
+      // Mark files as uploading
+      setUploadFiles(prev => prev.map(f => 
+        pendingFiles.includes(f) ? { ...f, status: "uploading", progress: 0 } : f
+      ));
+
+      // Upload files using the real API
+      await uploadMutation.mutateAsync({
+        files: pendingFiles.map(f => f.file),
+        alt: "Uploaded file",
+        caption: ""
+      });
+
+      // Mark files as completed
+      setUploadFiles(prev => prev.map(f => 
+        pendingFiles.includes(f) ? { ...f, status: "completed", progress: 100 } : f
+      ));
+
+      toast({
+        title: "Upload successful",
+        description: `${pendingFiles.length} file(s) uploaded successfully.`,
+      });
+
+      // Invalidate media cache to refresh MediaLibrary
+      queryClient.invalidateQueries({ queryKey: ['/api/media'] });
+
+      onUploadComplete?.();
+
+      // Navigate back to media library after 2 seconds
+      setTimeout(() => {
+        setLocation("/media");
+      }, 2000);
+
+    } catch (error: any) {
+      // Mark files as error
+      setUploadFiles(prev => prev.map(f => 
+        pendingFiles.includes(f) ? { 
+          ...f, 
+          status: "error", 
+          error: error.message || "Failed to upload file"
+        } : f
+      ));
+
+      toast({
+        title: "Upload failed",
+        description: error.message || "Failed to upload files. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const removeFile = (fileId: string) => {
     setUploadFiles(prev => prev.filter(f => f.id !== fileId));
-    onCancel(fileId);
   };
 
   const retryUpload = (fileId: string) => {
     setUploadFiles(prev => prev.map(f => 
       f.id === fileId ? { ...f, status: "pending", progress: 0, error: undefined } : f
     ));
-    simulateUpload(fileId);
-    onRetry(fileId);
   };
 
   const formatFileSize = (bytes: number) => {
@@ -153,15 +180,45 @@ export default function UploadPage({
   const completedCount = uploadFiles.filter(f => f.status === "completed").length;
   const errorCount = uploadFiles.filter(f => f.status === "error").length;
   const uploadingCount = uploadFiles.filter(f => f.status === "uploading").length;
+  const pendingCount = uploadFiles.filter(f => f.status === "pending").length;
 
   return (
     <Page data-testid="upload-page">
       <PageHeader>
         <div className="px-4 md:px-6">
           <PageToolbar>
-            <PageTitle>
-              Upload Media
-            </PageTitle>
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setLocation("/media")}
+                data-testid="back-button"
+                aria-label="Go back to media library"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <PageTitle>
+                Upload Media
+              </PageTitle>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setUploadFiles([])}
+                disabled={isUploading || uploadFiles.length === 0}
+                data-testid="clear-all"
+              >
+                Clear All
+              </Button>
+              <Button 
+                onClick={startUpload}
+                disabled={isUploading || pendingCount === 0}
+                data-testid="start-upload"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {isUploading ? "Uploading..." : `Upload ${pendingCount + errorCount} File${pendingCount + errorCount !== 1 ? 's' : ''}`}
+              </Button>
+            </div>
           </PageToolbar>
           
           <div className="mt-4 max-w-md">

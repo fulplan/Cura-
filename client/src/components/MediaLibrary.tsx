@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,17 +33,18 @@ import {
 import { useMedia, useDeleteMedia } from "@/hooks/useMedia";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingCard } from "@/components/ui/loading";
+import { queryClient } from "@/lib/queryClient";
 
 interface MediaLibraryProps {
-  onUpload?: () => void;
   onSelectFile?: (file: any) => void;
 }
 
-export default function MediaLibrary({ onUpload, onSelectFile }: MediaLibraryProps) {
+export default function MediaLibrary({ onSelectFile }: MediaLibraryProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [typeFilter, setTypeFilter] = useState("all");
 
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   
   // Fetch real media data
@@ -56,7 +58,7 @@ export default function MediaLibrary({ onUpload, onSelectFile }: MediaLibraryPro
     type: media.mimeType.startsWith('image/') ? 'image' : 
           media.mimeType.startsWith('video/') ? 'video' : 'document',
     size: formatFileSize(media.size),
-    uploadDate: new Date(media.createdAt).toLocaleDateString(),
+    uploadDate: media.createdAt, // Keep as ISO string
     dimensions: null, // Could extract from metadata
     thumbnail: media.mimeType.startsWith('image/') ? media.url : null,
     used: false // Could track usage
@@ -66,6 +68,10 @@ export default function MediaLibrary({ onUpload, onSelectFile }: MediaLibraryPro
   const handleDeleteMedia = async (mediaId: string) => {
     try {
       await deleteMutation.mutateAsync(mediaId);
+      
+      // Invalidate media cache to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['/api/media'] });
+      
       toast({
         title: "Media deleted",
         description: "The file has been successfully deleted.",
@@ -126,7 +132,7 @@ export default function MediaLibrary({ onUpload, onSelectFile }: MediaLibraryPro
     });
   }
 
-  const filteredFiles = mediaFiles.filter(file => {
+  const filteredFiles = mediaFiles.filter((file: any) => {
     const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = typeFilter === "all" || file.type === typeFilter;
     return matchesSearch && matchesType;
@@ -134,7 +140,7 @@ export default function MediaLibrary({ onUpload, onSelectFile }: MediaLibraryPro
 
   const GridView = () => (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
-      {filteredFiles.map((file) => {
+      {filteredFiles.map((file: any) => {
         const FileIcon = getFileIcon(file.type);
         return (
           <Card 
@@ -186,7 +192,14 @@ export default function MediaLibrary({ onUpload, onSelectFile }: MediaLibraryPro
                     <Download className="w-4 h-4 mr-2" />
                     Download
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive" data-testid={`menu-delete-${file.id}`}>
+                  <DropdownMenuItem 
+                    className="text-destructive" 
+                    data-testid={`menu-delete-${file.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteMedia(file.id);
+                    }}
+                  >
                     <Trash2 className="w-4 h-4 mr-2" />
                     Delete
                   </DropdownMenuItem>
@@ -201,7 +214,7 @@ export default function MediaLibrary({ onUpload, onSelectFile }: MediaLibraryPro
 
   const ListView = () => (
     <div className="space-y-2">
-      {filteredFiles.map((file) => {
+      {filteredFiles.map((file: any) => {
         const FileIcon = getFileIcon(file.type);
         return (
           <Card 
@@ -251,7 +264,13 @@ export default function MediaLibrary({ onUpload, onSelectFile }: MediaLibraryPro
                         <Download className="w-4 h-4 mr-2" />
                         Download
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">
+                      <DropdownMenuItem 
+                        className="text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteMedia(file.id);
+                        }}
+                      >
                         <Trash2 className="w-4 h-4 mr-2" />
                         Delete
                       </DropdownMenuItem>
@@ -274,7 +293,7 @@ export default function MediaLibrary({ onUpload, onSelectFile }: MediaLibraryPro
           <h1 className="text-2xl md:text-3xl font-semibold">Media Library</h1>
           <p className="text-muted-foreground text-sm md:text-base">Manage your images, videos, and documents</p>
         </div>
-        <Button onClick={onUpload} data-testid="button-upload-media" size="sm" className="shrink-0">
+        <Button onClick={() => setLocation("/upload")} data-testid="button-upload-media" size="sm" className="shrink-0">
           <Upload className="w-4 h-4 sm:mr-2" />
           <span className="hidden sm:inline">Upload Files</span>
         </Button>
@@ -347,7 +366,7 @@ export default function MediaLibrary({ onUpload, onSelectFile }: MediaLibraryPro
                   : "Upload your first file to get started"}
               </p>
               {!searchQuery && typeFilter === "all" && (
-                <Button onClick={onUpload} data-testid="button-upload-first">
+                <Button onClick={() => setLocation("/upload")} data-testid="button-upload-first">
                   <Upload className="w-4 h-4 mr-2" />
                   Upload Files
                 </Button>
