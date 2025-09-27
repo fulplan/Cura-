@@ -103,5 +103,14 @@ app.use((req, res, next) => {
     } catch (error) {
       log(`❌ Failed to initialize email service on startup: ${error}`);
     }
+
+    // Initialize scheduler service on startup
+    try {
+      const { schedulerService } = await import('./services/schedulerService');
+      schedulerService.initializeDefaultJobs();
+      log(`📅 Scheduler service initialized with default jobs`);
+    } catch (error) {
+      log(`❌ Failed to initialize scheduler service on startup: ${error}`);
+    }
   });
 })();

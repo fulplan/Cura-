@@ -48,8 +48,11 @@ export default function MediaLibraryPage({
 }: MediaLibraryPageProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [folderFilter, setFolderFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
   const { toast } = useToast();
   const { data: mediaData = [], isLoading, error } = useMedia();
@@ -69,16 +72,24 @@ export default function MediaLibraryPage({
     type: getFileTypeFromMime(media.mimeType),
     name: media.originalName,
     uploadDate: media.createdAt || new Date().toISOString(),
-    // For now, these will be undefined - could be added later
-    dimensions: undefined,
-    duration: undefined
+    // Extract metadata if available
+    dimensions: media.metadata && typeof media.metadata === 'object' && 'dimensions' in media.metadata && media.metadata.dimensions ? 
+      `${(media.metadata.dimensions as any).width}x${(media.metadata.dimensions as any).height}` : undefined,
+    duration: media.metadata && typeof media.metadata === 'object' && 'duration' in media.metadata ? 
+      (media.metadata.duration as number) : undefined
   }));
+
+  // Get unique folders for filtering
+  const folders = Array.from(new Set(mediaFiles.map(file => file.folder || "").filter(Boolean)));
 
   // Filter files based on search and filters
   const filteredFiles = mediaFiles.filter(file => {
     const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = typeFilter === "all" || file.type === typeFilter;
-    return matchesSearch && matchesType;
+    const matchesFolder = folderFilter === "all" || 
+      (folderFilter === "root" && !file.folder) || 
+      file.folder === folderFilter;
+    return matchesSearch && matchesType && matchesFolder;
   });
 
   const handleSelectFile = (fileId: string, checked: boolean) => {
@@ -98,6 +109,8 @@ export default function MediaLibraryPage({
   };
 
   const handleDeleteFiles = async (fileIds: string[]) => {
+    if (fileIds.length === 0) return;
+    
     try {
       // Delete files one by one
       for (const id of fileIds) {
@@ -111,6 +124,7 @@ export default function MediaLibraryPage({
       
       // Clear selection
       setSelectedFiles([]);
+      setShowDeleteDialog(false);
       
       // Call parent callback if provided
       onDelete?.(fileIds);
@@ -118,6 +132,22 @@ export default function MediaLibraryPage({
       toast({
         title: "Error",
         description: error.message || "Failed to delete files. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleBulkMoveToFolder = async (fileIds: string[], folder: string) => {
+    try {
+      // TODO: Implement bulk move API endpoint
+      toast({
+        title: "Feature Coming Soon",
+        description: "Bulk move to folder will be available in a future update.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to move files. Please try again.",
         variant: "destructive",
       });
     }
@@ -408,6 +438,22 @@ export default function MediaLibraryPage({
                   <SelectItem value="video">Videos</SelectItem>
                   <SelectItem value="audio">Audio</SelectItem>
                   <SelectItem value="document">Documents</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={folderFilter} onValueChange={setFolderFilter}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="Folder" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Folders</SelectItem>
+                  <SelectItem value="root">Root</SelectItem>
+                  {folders.map(folder => (
+                    <SelectItem key={folder} value={folder}>
+                      <Folder className="h-4 w-4 mr-2 inline" />
+                      {folder}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -73,8 +73,11 @@ export const media = pgTable("media", {
   mimeType: text("mime_type").notNull(),
   size: integer("size").notNull(),
   url: text("url").notNull(),
+  thumbnailUrl: text("thumbnail_url"), // For optimized thumbnails
   alt: text("alt"),
   caption: text("caption"),
+  folder: text("folder").default(""), // Folder path for organization
+  metadata: json("metadata"), // Store dimensions, duration, optimization info
   uploadedBy: varchar("uploaded_by").notNull().references(() => users.id),
   deletedAt: timestamp("deleted_at"), // Soft delete timestamp
   createdAt: timestamp("created_at").defaultNow(),
