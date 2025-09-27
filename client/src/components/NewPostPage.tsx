@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
-import { ArrowLeft, Save, Eye, MoreHorizontal, ImagePlus, Tag, Settings, Globe } from "lucide-react";
+import { ArrowLeft, Save, Eye, MoreHorizontal, ImagePlus, Tag, Settings, Globe, CheckCircle, Clock, AlertCircle } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
 import { useToast } from "@/hooks/use-toast";
 import { useCategories } from "@/hooks/useCategories";
@@ -68,11 +68,21 @@ export default function NewPostPage({
     publishDate: ""
   });
 
+  // Auto-save states
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [autoSavePostId, setAutoSavePostId] = useState<string | null>(null);
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Update form data when initialData changes (for edit mode)
   useEffect(() => {
     if (initialData && mode === 'edit') {
       setFormData(initialData);
       setIsDirty(false);
+      // For edit mode, we already have a post ID
+      if (initialData.id) {
+        setAutoSavePostId(initialData.id);
+      }
     }
   }, [initialData, mode]);
 
@@ -80,6 +90,109 @@ export default function NewPostPage({
   const [isDirty, setIsDirty] = useState(false);
   const [previewData, setPreviewData] = useState<any>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  // Auto-save function
+  const performAutoSave = useCallback(async () => {
+    if (!isDirty || !formData.title.trim()) return;
+    
+    setSaveStatus('saving');
+    
+    try {
+      // Create slug from title
+      const slug = formData.title.toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+      
+      let postData = {
+        ...formData,
+        slug,
+        status: "draft",
+        categoryId: formData.category
+      };
+      
+      // Remove the old category field
+      delete (postData as any).category;
+      
+      // Resolve tag names to IDs if tags exist (same logic as manual save)
+      if (formData.tags && formData.tags.length > 0) {
+        const tagIds = await createTagsMutation.mutateAsync(formData.tags);
+        postData = { ...postData, tags: tagIds };
+      }
+      
+      let savedPost;
+      
+      if (autoSavePostId && mode === 'edit') {
+        // Update existing post (edit mode) - properly await onSave
+        if (onSave) {
+          await onSave(postData);
+        }
+        savedPost = { id: autoSavePostId };
+      } else if (autoSavePostId) {
+        // Update auto-saved draft
+        const response = await fetch(`/api/posts/${autoSavePostId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(postData)
+        });
+        if (!response.ok) {
+          throw new Error('Failed to update draft');
+        }
+        savedPost = await response.json();
+      } else {
+        // Create new draft
+        savedPost = await createPostMutation.mutateAsync(postData);
+        setAutoSavePostId(savedPost.id);
+      }
+      
+      setLastSaved(new Date());
+      setSaveStatus('saved');
+      setIsDirty(false);
+      
+      // Clear saved status after 3 seconds
+      setTimeout(() => {
+        setSaveStatus('idle');
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+      setSaveStatus('error');
+      
+      // Clear error status after 5 seconds
+      setTimeout(() => {
+        setSaveStatus('idle');
+      }, 5000);
+    }
+  }, [isDirty, formData, autoSavePostId, mode, onSave, createPostMutation, createTagsMutation]);
+
+  // Set up auto-save timer
+  useEffect(() => {
+    if (isDirty) {
+      // Clear existing timer
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      
+      // Set new timer for 30 seconds
+      autoSaveTimerRef.current = setTimeout(() => {
+        performAutoSave();
+      }, 30000);
+    }
+    
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [isDirty, performAutoSave]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, []);
 
   // Optimized update function to prevent unnecessary re-renders
   const updateField = useCallback((field: string, value: any) => {
@@ -89,7 +202,10 @@ export default function NewPostPage({
       return { ...prev, [field]: value };
     });
     // Set dirty state in a separate effect to prevent re-render cascade
-    setTimeout(() => setIsDirty(true), 0);
+    setTimeout(() => {
+      setIsDirty(true);
+      setSaveStatus('idle'); // Reset save status when content changes
+    }, 0);
   }, []);
 
   // Stable tag functions to prevent re-renders
@@ -100,7 +216,10 @@ export default function NewPostPage({
         return { ...prev, tags: [...prev.tags, newTag.trim()] };
       });
       setNewTag("");
-      setTimeout(() => setIsDirty(true), 0);
+      setTimeout(() => {
+        setIsDirty(true);
+        setSaveStatus('idle');
+      }, 0);
     }
   }, [newTag]);
 
@@ -109,7 +228,10 @@ export default function NewPostPage({
       ...prev,
       tags: prev.tags.filter((tag: string) => tag !== tagToRemove)
     }));
-    setTimeout(() => setIsDirty(true), 0);
+    setTimeout(() => {
+      setIsDirty(true);
+      setSaveStatus('idle');
+    }, 0);
   }, []);
 
   const handleSave = async () => {
@@ -489,9 +611,27 @@ export default function NewPostPage({
                 <PageTitle className="type-heading">
                   {formData.title || (mode === 'edit' ? "Edit Post" : "New Post")}
                 </PageTitle>
-                {isDirty && (
+                {isDirty && saveStatus === 'idle' && (
                   <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/20">
                     Unsaved
+                  </Badge>
+                )}
+                {saveStatus === 'saving' && (
+                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800">
+                    <Clock className="h-3 w-3 mr-1 animate-spin" />
+                    Saving...
+                  </Badge>
+                )}
+                {saveStatus === 'saved' && (
+                  <Badge variant="outline" className="text-xs bg-green-50 text-green-600 border-green-200 dark:bg-green-950 dark:text-green-400 dark:border-green-800">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Saved
+                  </Badge>
+                )}
+                {saveStatus === 'error' && (
+                  <Badge variant="outline" className="text-xs bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    Save Failed
                   </Badge>
                 )}
               </div>
