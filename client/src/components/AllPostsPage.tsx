@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { Search, Filter, MoreHorizontal, Edit, Eye, Trash2, Plus, Grid, List, FileText } from "lucide-react";
 import { usePostsWithDetails, useDeletePost, mockPosts } from "@/hooks/usePosts";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -126,6 +127,72 @@ export default function AllPostsPage({
       toast({
         title: "Error",
         description: "Failed to delete the post. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    if (selectedPosts.length === 0) return;
+    
+    try {
+      // Delete posts in parallel
+      await Promise.all(
+        selectedPosts.map(postId => deleteMutation.mutateAsync(postId))
+      );
+      
+      toast({
+        title: "Posts deleted",
+        description: `Successfully deleted ${selectedPosts.length} post${selectedPosts.length !== 1 ? 's' : ''}.`,
+      });
+      
+      // Clear selection
+      setSelectedPosts([]);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete some posts. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle bulk status change
+  const handleBulkStatusChange = async (newStatus: string) => {
+    if (selectedPosts.length === 0) return;
+    
+    try {
+      // Update posts in parallel
+      await Promise.all(
+        selectedPosts.map(async (postId) => {
+          const response = await fetch(`/api/posts/${postId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              status: newStatus,
+              publishedAt: newStatus === 'published' ? new Date().toISOString() : undefined
+            })
+          });
+          if (!response.ok) {
+            throw new Error('Failed to update post');
+          }
+          return response.json();
+        })
+      );
+      
+      toast({
+        title: "Posts updated",
+        description: `Successfully updated ${selectedPosts.length} post${selectedPosts.length !== 1 ? 's' : ''} to ${newStatus}.`,
+      });
+      
+      // Clear selection and refresh data
+      setSelectedPosts([]);
+      queryClient.invalidateQueries({ queryKey: ['/api/posts'] });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update some posts. Please try again.",
         variant: "destructive",
       });
     }
@@ -443,11 +510,30 @@ export default function AllPostsPage({
                     {selectedPosts.length} post{selectedPosts.length !== 1 ? 's' : ''} selected
                   </span>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm">
-                      Bulk Edit
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleBulkStatusChange("published")}
+                      disabled={deleteMutation.isPending}
+                    >
+                      Publish Selected
                     </Button>
-                    <Button variant="outline" size="sm" className="text-destructive">
-                      Delete Selected
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleBulkStatusChange("draft")}
+                      disabled={deleteMutation.isPending}
+                    >
+                      Make Draft
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-destructive"
+                      onClick={handleBulkDelete}
+                      disabled={deleteMutation.isPending}
+                    >
+                      {deleteMutation.isPending ? "Deleting..." : "Delete Selected"}
                     </Button>
                   </div>
                 </div>
@@ -510,11 +596,21 @@ export default function AllPostsPage({
           {selectedPosts.length} selected
         </span>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            Edit
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => handleBulkStatusChange("published")}
+            disabled={deleteMutation.isPending}
+          >
+            Publish
           </Button>
-          <Button variant="destructive" size="sm">
-            Delete
+          <Button 
+            variant="destructive" 
+            size="sm"
+            onClick={handleBulkDelete}
+            disabled={deleteMutation.isPending}
+          >
+            {deleteMutation.isPending ? "Deleting..." : "Delete"}
           </Button>
         </div>
       </ActionBar>

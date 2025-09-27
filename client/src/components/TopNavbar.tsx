@@ -1,4 +1,4 @@
-import { Search, Bell, User, Settings, LogOut, PanelLeft, PanelLeftOpen, Menu } from "lucide-react";
+import { Search, Bell, User, Settings, LogOut, PanelLeft, PanelLeftOpen, Menu, FileText, Folder, Image, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,6 +20,9 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { useGlobalSearch } from "@/hooks/useSearch";
+import { useState, useRef, useEffect } from "react";
+import { cn } from "@/lib/utils";
 
 interface TopNavbarProps {
   onSearch?: (query: string) => void;
@@ -31,13 +34,72 @@ export default function TopNavbar({ onSearch, currentPage }: TopNavbarProps) {
   const { user, logout, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showResults, setShowResults] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  
+  const { data: searchData, isLoading: isSearching } = useGlobalSearch(searchQuery);
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const query = formData.get("search") as string;
-    onSearch?.(query);
-    console.log("Search triggered:", query);
+    if (query.trim()) {
+      setSearchQuery(query.trim());
+      setShowResults(true);
+      onSearch?.(query);
+    }
+  };
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    setShowResults(value.trim().length > 0);
+  };
+  
+  const handleResultClick = (result: any) => {
+    setShowResults(false);
+    setSearchQuery("");
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+    
+    // Navigate based on result type
+    switch (result.type) {
+      case 'post':
+        setLocation(`/posts/${result.id}`);
+        break;
+      case 'category':
+        setLocation(`/categories/${result.id}`);
+        break;
+      case 'media':
+        setLocation(`/media`);
+        break;
+      default:
+        break;
+    }
+  };
+  
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowResults(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+  
+  const getResultIcon = (type: string) => {
+    switch (type) {
+      case 'post': return <FileText className="h-4 w-4" />;
+      case 'category': return <Folder className="h-4 w-4" />;
+      case 'media': return <Image className="h-4 w-4" />;
+      default: return <FileText className="h-4 w-4" />;
+    }
   };
 
   const handleLogout = async () => {
@@ -105,15 +167,79 @@ export default function TopNavbar({ onSearch, currentPage }: TopNavbarProps) {
           </div>
         </div>
         
-        <form onSubmit={handleSearch} className="relative hidden md:block flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            name="search"
-            placeholder="Search posts, users, media..."
-            className="pl-10 w-full"
-            data-testid="input-global-search"
-          />
-        </form>
+        <div ref={searchRef} className="relative hidden md:block flex-1 max-w-md">
+          <form onSubmit={handleSearch}>
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              ref={inputRef}
+              name="search"
+              placeholder="Search posts, categories, media..."
+              className="pl-10 w-full"
+              data-testid="input-global-search"
+              onChange={handleInputChange}
+              onFocus={() => searchQuery.trim().length > 0 && setShowResults(true)}
+            />
+          </form>
+          
+          {/* Search Results Dropdown */}
+          {showResults && (
+            <div className="absolute top-full mt-1 w-full bg-popover border rounded-md shadow-lg z-50 max-h-96 overflow-y-auto">
+              {isSearching ? (
+                <div className="p-4 text-center text-muted-foreground">
+                  <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+                  Searching...
+                </div>
+              ) : searchData?.results?.length ? (
+                <div className="py-2">
+                  <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b">
+                    {searchData.total} result{searchData.total !== 1 ? 's' : ''} found
+                  </div>
+                  {searchData.results.map((result) => (
+                    <button
+                      key={`${result.type}-${result.id}`}
+                      onClick={() => handleResultClick(result)}
+                      className="w-full px-3 py-2 text-left hover:bg-accent focus:bg-accent focus:outline-none transition-colors flex items-start gap-3"
+                    >
+                      <div className="mt-0.5 text-muted-foreground">
+                        {getResultIcon(result.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{result.title}</div>
+                        {result.excerpt && (
+                          <div className="text-sm text-muted-foreground truncate">
+                            {result.excerpt}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs px-1.5 py-0.5 bg-secondary rounded capitalize">
+                            {result.type}
+                          </span>
+                          {result.authorName && (
+                            <span className="text-xs text-muted-foreground">
+                              by {result.authorName}
+                            </span>
+                          )}
+                          {result.categoryName && (
+                            <span className="text-xs text-muted-foreground">
+                              in {result.categoryName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
+                </div>
+              ) : searchQuery.trim().length > 0 ? (
+                <div className="p-4 text-center text-muted-foreground">
+                  <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No results found for "{searchQuery}"</p>
+                  <p className="text-xs mt-1">Try different keywords or check your spelling</p>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-2 md:gap-4">

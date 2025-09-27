@@ -531,6 +531,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Search Route - Global search across posts
+  app.get("/api/search", async (req, res) => {
+    try {
+      const { query, type = "all", limit = "10" } = req.query;
+      
+      if (!query || typeof query !== 'string' || query.trim().length === 0) {
+        return res.json({ results: [], total: 0 });
+      }
+      
+      const searchQuery = query.trim();
+      const searchLimit = parseInt(limit as string) || 10;
+      
+      try {
+        const results = await storage.searchContent(searchQuery, type as string, searchLimit);
+        res.json(results);
+      } catch (error) {
+        console.error("Search error:", error);
+        // Fallback to empty results instead of error
+        res.json({ results: [], total: 0 });
+      }
+    } catch (error) {
+      console.error("Search endpoint error:", error);
+      sendError(res, 500, "Search failed");
+    }
+  });
+
   // Post Routes
   app.get("/api/posts", async (req, res) => {
     try {
@@ -540,7 +566,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         authorId, 
         limit = "20", 
         offset = "0",
-        detailed = "false" 
+        detailed = "false",
+        search
       } = req.query;
 
       const filters = {

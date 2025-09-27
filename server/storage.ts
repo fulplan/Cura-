@@ -82,6 +82,9 @@ export interface IStorage {
   getSettings(category?: string, publicOnly?: boolean): Promise<Setting[]>;
   deleteSetting(key: string): Promise<boolean>;
   updateSetting(key: string, updates: Partial<InsertSetting>): Promise<Setting | undefined>;
+
+  // Search
+  searchContent(query: string, type?: string, limit?: number): Promise<{ results: any[]; total: number }>;
   
   // Sections
   createSection(section: InsertSection, createdBy: string): Promise<Section>;
@@ -780,6 +783,134 @@ export class PostgreSQLStorage implements IStorage {
     } catch (error) {
       console.error('Failed to reorder sections:', error);
       return false;
+    }
+  }
+
+  // Search functionality
+  async searchContent(query: string, type = "all", limit = 10): Promise<{ results: any[]; total: number }> {
+    try {
+      const searchTerms = `%${query.toLowerCase()}%`;
+      const results: any[] = [];
+
+      if (type === "all" || type === "posts") {
+        // Search posts by title, excerpt, and content
+        const postResults = await db.select({
+          id: posts.id,
+          title: posts.title,
+          excerpt: posts.excerpt,
+          slug: posts.slug,
+          status: posts.status,
+          createdAt: posts.createdAt,
+          type: sql<string>`'post'`.as('type'),
+          authorName: users.displayName,
+          categoryName: categories.name
+        })
+        .from(posts)
+        .leftJoin(users, eq(posts.authorId, users.id))
+        .leftJoin(categories, eq(posts.categoryId, categories.id))
+        .where(
+          and(
+            sql`${posts.deletedAt} IS NULL`,
+            or(
+              sql`LOWER(${posts.title}) LIKE ${searchTerms}`,
+              sql`LOWER(${posts.excerpt}) LIKE ${searchTerms}`,
+              sql`LOWER(${posts.content}) LIKE ${searchTerms}`
+            )
+          )
+        )
+        .limit(type === "posts" ? limit : Math.max(1, Math.floor(limit / 3)))
+        .orderBy(desc(posts.createdAt));
+
+        results.push(...postResults);
+      }
+
+      if (type === "all" || type === "categories") {
+        // Search categories
+        const categoryResults = await db.select({
+          id: categories.id,
+          title: categories.name,
+          excerpt: categories.description,
+          slug: categories.slug,
+          createdAt: categories.createdAt,
+          type: sql<string>`'category'`.as('type'),
+          postCount: sql<number>`0`.as('postCount')
+        })
+        .from(categories)
+        .where(
+          and(
+            sql`${categories.deletedAt} IS NULL`,
+            or(
+              sql`LOWER(${categories.name}) LIKE ${searchTerms}`,
+              sql`LOWER(${categories.description}) LIKE ${searchTerms}`
+            )
+          )
+        )
+        .limit(type === "categories" ? limit : Math.max(1, Math.floor(limit / 3)))
+        .orderBy(desc(categories.createdAt));
+
+        results.push(...categoryResults);
+      }
+
+      if (type === "all" || type === "media") {
+        // Search media files
+        const mediaResults = await db.select({
+          id: media.id,
+          title: media.filename,
+          excerpt: media.altText,
+          createdAt: media.createdAt,
+          type: sql<string>`'media'`.as('type'),
+          fileUrl: media.fileUrl,
+          fileType: media.fileType,
+          fileSize: media.fileSize
+        })
+        .from(media)
+        .where(
+          and(
+            sql`${media.deletedAt} IS NULL`,
+            or(
+              sql`LOWER(${media.filename}) LIKE ${searchTerms}`,
+              sql`LOWER(${media.altText}) LIKE ${searchTerms}`
+            )
+          )
+        )
+        .limit(type === "media" ? limit : Math.max(1, Math.floor(limit / 3)))
+        .orderBy(desc(media.createdAt));
+
+        results.push(...mediaResults);
+      }
+
+      // Sort all results by relevance (exact matches first, then partial matches)
+      // and by recency within each relevance group
+      const sortedResults = results
+        .sort((a, b) => {
+          const aTitle = a.title?.toLowerCase() || '';
+          const bTitle = b.title?.toLowerCase() || '';
+          const queryLower = query.toLowerCase();
+          
+          // Exact title matches first
+          const aExact = aTitle === queryLower ? 1 : 0;
+          const bExact = bTitle === queryLower ? 1 : 0;
+          
+          if (aExact !== bExact) return bExact - aExact;
+          
+          // Title starts with query
+          const aStarts = aTitle.startsWith(queryLower) ? 1 : 0;
+          const bStarts = bTitle.startsWith(queryLower) ? 1 : 0;
+          
+          if (aStarts !== bStarts) return bStarts - aStarts;
+          
+          // Then by recency
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        })
+        .slice(0, limit);
+
+      return {
+        results: sortedResults,
+        total: sortedResults.length
+      };
+    } catch (error) {
+      console.error('Search content error:', error);
+      return { results: [], total: 0 };
     }
   }
 }
