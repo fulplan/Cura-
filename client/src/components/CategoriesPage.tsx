@@ -48,33 +48,21 @@ interface CategoriesPageProps {
   onDeleteTag?: (id: string) => void;
 }
 
-// Mock data
-const mockCategories: Category[] = [
-  { id: "1", name: "Development", slug: "development", description: "Programming and software development content", postCount: 45, color: "#3b82f6" },
-  { id: "2", name: "Design", slug: "design", description: "UI/UX design and visual content", postCount: 23, color: "#8b5cf6" },
-  { id: "3", name: "Technology", slug: "technology", description: "Latest tech news and trends", postCount: 31, color: "#06b6d4" },
-];
-
-const mockTags: Tag[] = [
-  { id: "1", name: "React", slug: "react", postCount: 18 },
-  { id: "2", name: "TypeScript", slug: "typescript", postCount: 15 },
-  { id: "3", name: "CSS", slug: "css", postCount: 12 },
-  { id: "4", name: "JavaScript", slug: "javascript", postCount: 22 },
-  { id: "5", name: "Tutorial", slug: "tutorial", postCount: 8 },
-];
 
 export default function CategoriesPage({ 
-  onCreateCategory = (data) => console.log("Create category:", data),
-  onEditCategory = (id, data) => console.log("Edit category:", id, data),
-  onDeleteCategory = (id) => console.log("Delete category:", id),
-  onCreateTag = (data) => console.log("Create tag:", data),
-  onEditTag = (id, data) => console.log("Edit tag:", id, data),
-  onDeleteTag = (id) => console.log("Delete tag:", id)
-}: CategoriesPageProps) {
+  onCreateCategory,
+  onEditCategory,
+  onDeleteCategory,
+  onCreateTag,
+  onEditTag,
+  onDeleteTag
+}: CategoriesPageProps = {}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("categories");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [newItemData, setNewItemData] = useState({ name: "", description: "" });
+  const [editItemData, setEditItemData] = useState<{ id: string; name: string; description: string } | null>(null);
   
   const { toast } = useToast();
   const { data: categories = [], isLoading: categoriesLoading } = useCategories();
@@ -109,7 +97,7 @@ export default function CategoriesPage({
           title: "Success",
           description: "Category created successfully.",
         });
-        onCreateCategory({
+        onCreateCategory?.({
           name: newItemData.name,
           description: newItemData.description,
           slug
@@ -123,7 +111,7 @@ export default function CategoriesPage({
           title: "Success",
           description: "Tag created successfully.",
         });
-        onCreateTag({
+        onCreateTag?.({
           name: newItemData.name,
           slug
         });
@@ -146,7 +134,7 @@ export default function CategoriesPage({
         title: "Success",
         description: "Category deleted successfully.",
       });
-      onDeleteCategory(id);
+      onDeleteCategory?.(id);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -163,7 +151,7 @@ export default function CategoriesPage({
         title: "Success",
         description: "Tag deleted successfully.",
       });
-      onDeleteTag(id);
+      onDeleteTag?.(id);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -200,7 +188,7 @@ export default function CategoriesPage({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onEditCategory(category.id, category)}>
+                <DropdownMenuItem onClick={() => onEditCategory?.(category.id, category)}>
                   <Edit className="h-4 w-4 mr-2" />
                   Edit
                 </DropdownMenuItem>
@@ -250,7 +238,7 @@ export default function CategoriesPage({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onEditTag(tag.id, tag)}>
+                <DropdownMenuItem onClick={() => onEditTag?.(tag.id, tag)}>
                   <Edit className="h-4 w-4 mr-2" />
                   Edit
                 </DropdownMenuItem>
@@ -352,11 +340,11 @@ export default function CategoriesPage({
           <TabsList className="grid w-full grid-cols-2 max-w-md">
             <TabsTrigger value="categories" className="flex items-center gap-2">
               <FolderPlus className="h-4 w-4" />
-              Categories ({mockCategories.length})
+              Categories ({categories.length})
             </TabsTrigger>
             <TabsTrigger value="tags" className="flex items-center gap-2">
               <Tag className="h-4 w-4" />
-              Tags ({mockTags.length})
+              Tags ({tags.length})
             </TabsTrigger>
           </TabsList>
           
@@ -382,7 +370,7 @@ export default function CategoriesPage({
               )
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredCategories.map(category => (
+                {filteredCategories.map((category: Category) => (
                   <CategoryCard key={category.id} category={category} />
                 ))}
               </div>
@@ -411,7 +399,7 @@ export default function CategoriesPage({
               )
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {filteredTags.map(tag => (
+                {filteredTags.map((tag: Tag) => (
                   <TagCard key={tag.id} tag={tag} />
                 ))}
               </div>
