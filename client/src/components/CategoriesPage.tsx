@@ -62,7 +62,7 @@ export default function CategoriesPage({
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [newItemData, setNewItemData] = useState({ name: "", description: "" });
-  const [editItemData, setEditItemData] = useState<{ id: string; name: string; description: string } | null>(null);
+  const [editItemData, setEditItemData] = useState<{ id: string; name: string; description: string; type: 'category' | 'tag' } | null>(null);
   
   const { toast } = useToast();
   const { data: categories = [], isLoading: categoriesLoading } = useCategories();
@@ -161,6 +161,74 @@ export default function CategoriesPage({
     }
   };
 
+  const handleEditCategory = (category: Category) => {
+    setEditItemData({
+      id: category.id,
+      name: category.name,
+      description: category.description || "",
+      type: 'category'
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditTag = (tag: Tag) => {
+    setEditItemData({
+      id: tag.id,
+      name: tag.name,
+      description: "",
+      type: 'tag'
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditItem = async () => {
+    if (!editItemData) return;
+    
+    try {
+      const slug = editItemData.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+      
+      if (editItemData.type === "category") {
+        await updateCategoryMutation.mutateAsync({
+          id: editItemData.id,
+          name: editItemData.name,
+          description: editItemData.description,
+          slug
+        });
+        toast({
+          title: "Success",
+          description: "Category updated successfully.",
+        });
+        onEditCategory?.(editItemData.id, {
+          name: editItemData.name,
+          description: editItemData.description,
+          slug
+        });
+      } else {
+        await updateTagMutation.mutateAsync({
+          id: editItemData.id,
+          name: editItemData.name,
+          slug
+        });
+        toast({
+          title: "Success",
+          description: "Tag updated successfully.",
+        });
+        onEditTag?.(editItemData.id, {
+          name: editItemData.name,
+          slug
+        });
+      }
+      setEditItemData(null);
+      setIsEditDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || `Failed to update ${editItemData.type}. Please try again.`,
+        variant: "destructive",
+      });
+    }
+  };
+
   const CategoryCard = ({ category }: { category: Category }) => (
     <Card className="hover-elevate" data-testid={`category-card-${category.id}`}>
       <CardHeader className="pb-3">
@@ -188,7 +256,7 @@ export default function CategoriesPage({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onEditCategory?.(category.id, category)}>
+                <DropdownMenuItem onClick={() => handleEditCategory(category)}>
                   <Edit className="h-4 w-4 mr-2" />
                   Edit
                 </DropdownMenuItem>
@@ -238,7 +306,7 @@ export default function CategoriesPage({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onEditTag?.(tag.id, tag)}>
+                <DropdownMenuItem onClick={() => handleEditTag(tag)}>
                   <Edit className="h-4 w-4 mr-2" />
                   Edit
                 </DropdownMenuItem>
@@ -295,6 +363,54 @@ export default function CategoriesPage({
             </Button>
             <Button onClick={handleCreateItem} disabled={!newItemData.name.trim()}>
               Create {activeTab === "categories" ? "Category" : "Tag"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const EditDialog = () => (
+    <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+      setIsEditDialogOpen(open);
+      if (!open) setEditItemData(null); // Clear data on close
+    }}>
+      <DialogContent data-testid="edit-dialog">
+        <DialogHeader>
+          <DialogTitle>
+            Edit {editItemData?.type === "category" ? "Category" : "Tag"}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="edit-name">Name *</Label>
+            <Input
+              id="edit-name"
+              placeholder={`Enter ${editItemData?.type === "category" ? "category" : "tag"} name...`}
+              value={editItemData?.name || ""}
+              onChange={(e) => setEditItemData(prev => prev ? ({ ...prev, name: e.target.value }) : null)}
+              data-testid="edit-item-name"
+            />
+          </div>
+          {editItemData?.type === "category" && (
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                placeholder="Enter category description..."
+                value={editItemData?.description || ""}
+                onChange={(e) => setEditItemData(prev => prev ? ({ ...prev, description: e.target.value }) : null)}
+                className="h-20"
+                data-testid="edit-item-description"
+              />
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditItem} disabled={!editItemData?.name?.trim()}>
+              Update {editItemData?.type === "category" ? "Category" : "Tag"}
             </Button>
           </div>
         </div>
@@ -418,6 +534,7 @@ export default function CategoriesPage({
       </FAB>
 
       <CreateDialog />
+      <EditDialog />
     </Page>
   );
 }

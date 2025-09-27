@@ -480,7 +480,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/tags", async (req, res) => {
+  app.post("/api/tags", requireEditor, async (req, res) => {
     try {
       const tagData = validateBody(insertTagSchema, req.body);
       const tag = await storage.createTag(tagData);
@@ -504,7 +504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/tags/:id", async (req, res) => {
+  app.put("/api/tags/:id", requireEditor, async (req, res) => {
     try {
       const tagData = validateBody(insertTagSchema.partial(), req.body);
       const tag = await storage.updateTag(req.params.id, tagData);
@@ -518,7 +518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/tags/:id", async (req, res) => {
+  app.delete("/api/tags/:id", requireEditor, async (req, res) => {
     try {
       const success = await storage.deleteTag(req.params.id);
       if (!success) {
