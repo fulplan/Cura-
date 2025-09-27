@@ -2,6 +2,9 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { LoadingCard } from "@/components/ui/loading";
+import { useToast } from "@/hooks/use-toast";
+import { useSections, useCreateSection, useDeleteSection, useReorderSections } from "@/hooks/useSections";
 import { 
   Plus,
   GripVertical,
@@ -28,8 +31,14 @@ interface LayoutManagerProps {
 
 export default function LayoutManager({ onAddSection, onEditSection }: LayoutManagerProps) {
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  // TODO: Remove mock data
+  // Use real API data
+  const { data: sections = [], isLoading, error } = useSections();
+  const createSectionMutation = useCreateSection();
+  const deleteSectionMutation = useDeleteSection();
+  const reorderSectionsMutation = useReorderSections();
+
   const sectionTypes = [
     { id: "hero", name: "Hero Section", icon: Layout, description: "Large banner with title and CTA" },
     { id: "text", name: "Text Block", icon: Type, description: "Rich text content area" },
@@ -37,32 +46,51 @@ export default function LayoutManager({ onAddSection, onEditSection }: LayoutMan
     { id: "video", name: "Video Embed", icon: Video, description: "YouTube or video player" },
   ];
 
-  const currentSections = [
-    {
-      id: "section-1",
-      type: "hero",
-      title: "Welcome Hero",
-      content: "Main landing page hero with call-to-action",
-      status: "active",
-      order: 0
-    },
-    {
-      id: "section-2", 
-      type: "text",
-      title: "About Section",
-      content: "Company overview and mission statement",
-      status: "active",
-      order: 1
-    },
-    {
-      id: "section-3",
-      type: "image", 
-      title: "Feature Gallery",
-      content: "Product screenshots and images",
-      status: "draft",
-      order: 2
+  // Handle section creation
+  const handleAddSection = async (sectionType: string) => {
+    try {
+      const sectionTemplate = sectionTypes.find(type => type.id === sectionType);
+      if (!sectionTemplate) return;
+
+      await createSectionMutation.mutateAsync({
+        title: `New ${sectionTemplate.name}`,
+        type: sectionType,
+        content: { description: sectionTemplate.description },
+        status: "draft",
+        order: sections.length,
+      });
+
+      toast({
+        title: "Section added",
+        description: `${sectionTemplate.name} has been added to your layout.`,
+      });
+
+      onAddSection?.(sectionType);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add section. Please try again.",
+        variant: "destructive",
+      });
     }
-  ];
+  };
+
+  // Handle section deletion
+  const handleDeleteSection = async (sectionId: string) => {
+    try {
+      await deleteSectionMutation.mutateAsync(sectionId);
+      toast({
+        title: "Section deleted",
+        description: "The section has been moved to trash.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete section. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleDragStart = (e: React.DragEvent, sectionId: string) => {
     setDraggedItem(sectionId);
@@ -74,11 +102,37 @@ export default function LayoutManager({ onAddSection, onEditSection }: LayoutMan
     e.dataTransfer.dropEffect = "move";
   };
 
-  const handleDrop = (e: React.DragEvent, targetId: string) => {
+  const handleDrop = async (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
     if (draggedItem && draggedItem !== targetId) {
-      console.log(`Move section ${draggedItem} to position of ${targetId}`);
-      // TODO: Implement section reordering
+      try {
+        // Calculate new order based on drop position
+        const targetIndex = sections.findIndex((s: any) => s.id === targetId);
+        const draggedIndex = sections.findIndex((s: any) => s.id === draggedItem);
+        
+        if (targetIndex !== -1 && draggedIndex !== -1) {
+          // Create new order array
+          const reorderedSections = [...sections];
+          const [draggedSection] = reorderedSections.splice(draggedIndex, 1);
+          reorderedSections.splice(targetIndex, 0, draggedSection);
+          
+          // Extract IDs in new order
+          const newSectionIds = reorderedSections.map((s: any) => s.id);
+          
+          await reorderSectionsMutation.mutateAsync(newSectionIds);
+          
+          toast({
+            title: "Sections reordered",
+            description: "The page layout has been updated.",
+          });
+        }
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to reorder sections. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
     setDraggedItem(null);
   };
@@ -92,6 +146,54 @@ export default function LayoutManager({ onAddSection, onEditSection }: LayoutMan
     return section?.icon || Layout;
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-semibold">Layout Manager</h1>
+            <p className="text-muted-foreground text-sm md:text-base">Drag and drop to arrange your page sections</p>
+          </div>
+          <Button disabled size="sm" className="shrink-0">
+            <Plus className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Add Section</span>
+          </Button>
+        </div>
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <LoadingCard key={i} className="h-20" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-semibold">Layout Manager</h1>
+            <p className="text-muted-foreground text-sm md:text-base">Drag and drop to arrange your page sections</p>
+          </div>
+          <Button onClick={() => window.location.reload()} size="sm" className="shrink-0">
+            <Plus className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Retry</span>
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="text-center py-8">
+            <Layout className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">Failed to load sections</h3>
+            <p className="text-muted-foreground">Please try refreshing the page</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
@@ -102,7 +204,12 @@ export default function LayoutManager({ onAddSection, onEditSection }: LayoutMan
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button data-testid="button-add-section" size="sm" className="shrink-0">
+            <Button 
+              data-testid="button-add-section" 
+              size="sm" 
+              className="shrink-0"
+              disabled={createSectionMutation.isPending}
+            >
               <Plus className="w-4 h-4 sm:mr-2" />
               <span className="hidden sm:inline">Add Section</span>
             </Button>
@@ -113,11 +220,9 @@ export default function LayoutManager({ onAddSection, onEditSection }: LayoutMan
               return (
                 <DropdownMenuItem
                   key={type.id}
-                  onClick={() => {
-                    onAddSection?.(type.id);
-                    console.log(`Add section: ${type.id}`);
-                  }}
+                  onClick={() => handleAddSection(type.id)}
                   data-testid={`menu-add-${type.id}`}
+                  disabled={createSectionMutation.isPending}
                 >
                   <IconComponent className="w-4 h-4 mr-2" />
                   <div>
@@ -144,10 +249,7 @@ export default function LayoutManager({ onAddSection, onEditSection }: LayoutMan
                 <Card 
                   key={type.id} 
                   className="hover-elevate cursor-pointer"
-                  onClick={() => {
-                    onAddSection?.(type.id);
-                    console.log(`Add section template: ${type.id}`);
-                  }}
+                  onClick={() => handleAddSection(type.id)}
                   data-testid={`template-${type.id}`}
                 >
                   <CardContent className="p-3 md:p-4 text-center">
@@ -172,7 +274,7 @@ export default function LayoutManager({ onAddSection, onEditSection }: LayoutMan
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {currentSections.map((section, index) => {
+            {sections.map((section: any, index: number) => {
               const SectionIcon = getSectionIcon(section.type);
               return (
                 <Card
@@ -211,7 +313,12 @@ export default function LayoutManager({ onAddSection, onEditSection }: LayoutMan
                           variant="ghost"
                           size="icon"
                           className="w-8 h-8"
-                          onClick={() => console.log(`Preview section: ${section.id}`)}
+                          onClick={() => {
+                            toast({
+                              title: "Preview",
+                              description: "Section preview functionality coming soon.",
+                            });
+                          }}
                           data-testid={`button-preview-${section.id}`}
                         >
                           <Eye className="w-4 h-4" />
@@ -223,7 +330,6 @@ export default function LayoutManager({ onAddSection, onEditSection }: LayoutMan
                           className="w-8 h-8"
                           onClick={() => {
                             onEditSection?.(section.id);
-                            console.log(`Edit section: ${section.id}`);
                           }}
                           data-testid={`button-edit-${section.id}`}
                         >
@@ -234,7 +340,12 @@ export default function LayoutManager({ onAddSection, onEditSection }: LayoutMan
                           variant="ghost"
                           size="icon" 
                           className="w-8 h-8"
-                          onClick={() => console.log(`Duplicate section: ${section.id}`)}
+                          onClick={() => {
+                            toast({
+                              title: "Duplicate",
+                              description: "Section duplication functionality coming soon.",
+                            });
+                          }}
                           data-testid={`button-duplicate-${section.id}`}
                         >
                           <Copy className="w-4 h-4" />
@@ -244,7 +355,7 @@ export default function LayoutManager({ onAddSection, onEditSection }: LayoutMan
                           variant="ghost"
                           size="icon"
                           className="w-8 h-8 text-destructive hover:text-destructive"
-                          onClick={() => console.log(`Delete section: ${section.id}`)}
+                          onClick={() => handleDeleteSection(section.id)}
                           data-testid={`button-delete-${section.id}`}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -257,7 +368,7 @@ export default function LayoutManager({ onAddSection, onEditSection }: LayoutMan
             })}
           </div>
 
-          {currentSections.length === 0 && (
+          {sections.length === 0 && (
             <div className="text-center py-8">
               <Layout className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">No sections yet</h3>

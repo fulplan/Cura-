@@ -6,7 +6,8 @@ import {
   type Media, type InsertMedia,
   type Analytics,
   type Setting, type InsertSetting,
-  users, posts, categories, tags, media, analytics, postTags, settings
+  type Section, type InsertSection,
+  users, posts, categories, tags, media, analytics, postTags, settings, sections
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, like, count, sql } from "drizzle-orm";
@@ -81,6 +82,16 @@ export interface IStorage {
   getSettings(category?: string, publicOnly?: boolean): Promise<Setting[]>;
   deleteSetting(key: string): Promise<boolean>;
   updateSetting(key: string, updates: Partial<InsertSetting>): Promise<Setting | undefined>;
+  
+  // Sections
+  createSection(section: InsertSection, createdBy: string): Promise<Section>;
+  getSection(id: string): Promise<Section | undefined>;
+  updateSection(id: string, section: Partial<InsertSection>): Promise<Section | undefined>;
+  deleteSection(id: string): Promise<boolean>;
+  softDeleteSection(id: string): Promise<boolean>;
+  restoreSection(id: string): Promise<boolean>;
+  listSections(pageId?: string, includeDeleted?: boolean): Promise<Section[]>;
+  reorderSections(sectionIds: string[]): Promise<boolean>;
   
   // Email service initialization
   initializeEmailService(): Promise<void>;
@@ -695,6 +706,80 @@ export class PostgreSQLStorage implements IStorage {
       }
     } catch (error) {
       console.error('❌ Failed to initialize email service:', error);
+    }
+  }
+
+  // Sections
+  async createSection(sectionData: InsertSection, createdBy: string): Promise<Section> {
+    const result = await db.insert(sections).values({ ...sectionData, createdBy }).returning();
+    return result[0];
+  }
+
+  async getSection(id: string): Promise<Section | undefined> {
+    const result = await db.select().from(sections)
+      .where(and(eq(sections.id, id), sql`${sections.deletedAt} IS NULL`))
+      .limit(1);
+    return result[0];
+  }
+
+  async updateSection(id: string, sectionData: Partial<InsertSection>): Promise<Section | undefined> {
+    const result = await db.update(sections)
+      .set({ ...sectionData, updatedAt: new Date() })
+      .where(eq(sections.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteSection(id: string): Promise<boolean> {
+    return this.softDeleteSection(id);
+  }
+
+  async softDeleteSection(id: string): Promise<boolean> {
+    const result = await db.update(sections)
+      .set({ deletedAt: new Date() })
+      .where(eq(sections.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async restoreSection(id: string): Promise<boolean> {
+    const result = await db.update(sections)
+      .set({ deletedAt: null })
+      .where(eq(sections.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async listSections(pageId?: string, includeDeleted = false): Promise<Section[]> {
+    let query = db.select().from(sections);
+    
+    const conditions = [];
+    if (!includeDeleted) {
+      conditions.push(sql`${sections.deletedAt} IS NULL`);
+    }
+    if (pageId) {
+      conditions.push(eq(sections.pageId, pageId));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(conditions.length === 1 ? conditions[0] : and(...conditions)) as any;
+    }
+    
+    return query.orderBy(asc(sections.order), asc(sections.createdAt));
+  }
+
+  async reorderSections(sectionIds: string[]): Promise<boolean> {
+    try {
+      // Update the order of sections based on the provided array
+      for (let i = 0; i < sectionIds.length; i++) {
+        await db.update(sections)
+          .set({ order: i, updatedAt: new Date() })
+          .where(eq(sections.id, sectionIds[i]));
+      }
+      return true;
+    } catch (error) {
+      console.error('Failed to reorder sections:', error);
+      return false;
     }
   }
 }

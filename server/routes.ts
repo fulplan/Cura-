@@ -6,7 +6,8 @@ import {
   insertPostSchema,
   insertCategorySchema,
   insertTagSchema,
-  insertMediaSchema 
+  insertMediaSchema,
+  insertSectionSchema
 } from "@shared/schema";
 import { z } from "zod";
 import session from "express-session";
@@ -1081,6 +1082,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Send test email error:", error);
       sendError(res, 500, "Failed to send test email");
+    }
+  });
+
+  // Sections Routes
+  
+  // Get all sections
+  app.get("/api/sections", requireAuth, async (req, res) => {
+    try {
+      const pageId = req.query.pageId as string;
+      const includeDeleted = req.query.includeDeleted === 'true';
+      const sections = await storage.listSections(pageId, includeDeleted);
+      res.json(sections);
+    } catch (error) {
+      console.error("List sections error:", error);
+      sendError(res, 500, "Failed to fetch sections");
+    }
+  });
+
+  // Create a new section
+  app.post("/api/sections", requireEditor, async (req, res) => {
+    try {
+      const sectionData = validateBody(insertSectionSchema, req.body);
+      const section = await storage.createSection(sectionData, (req.session as any).user.id);
+      res.status(201).json(section);
+    } catch (error) {
+      console.error("Create section error:", error);
+      handleDbError(error, res, "Failed to create section");
+    }
+  });
+
+  // Get a single section by ID
+  app.get("/api/sections/:id", requireAuth, async (req, res) => {
+    try {
+      const section = await storage.getSection(req.params.id);
+      if (!section) {
+        return sendError(res, 404, "Section not found");
+      }
+      res.json(section);
+    } catch (error) {
+      console.error("Get section error:", error);
+      sendError(res, 500, "Failed to fetch section");
+    }
+  });
+
+  // Update a section
+  app.put("/api/sections/:id", requireEditor, async (req, res) => {
+    try {
+      const sectionData = validateBody(insertSectionSchema.partial(), req.body);
+      const section = await storage.updateSection(req.params.id, sectionData);
+      if (!section) {
+        return sendError(res, 404, "Section not found");
+      }
+      res.json(section);
+    } catch (error) {
+      console.error("Update section error:", error);
+      handleDbError(error, res, "Failed to update section");
+    }
+  });
+
+  // Delete a section (soft delete)
+  app.delete("/api/sections/:id", requireEditor, async (req, res) => {
+    try {
+      const deleted = await storage.deleteSection(req.params.id);
+      if (!deleted) {
+        return sendError(res, 404, "Section not found");
+      }
+      res.json({ message: "Section deleted successfully" });
+    } catch (error) {
+      console.error("Delete section error:", error);
+      sendError(res, 500, "Failed to delete section");
+    }
+  });
+
+  // Restore a deleted section
+  app.post("/api/sections/:id/restore", requireEditor, async (req, res) => {
+    try {
+      const restored = await storage.restoreSection(req.params.id);
+      if (!restored) {
+        return sendError(res, 404, "Section not found");
+      }
+      res.json({ message: "Section restored successfully" });
+    } catch (error) {
+      console.error("Restore section error:", error);
+      sendError(res, 500, "Failed to restore section");
+    }
+  });
+
+  // Reorder sections
+  app.post("/api/sections/reorder", requireEditor, async (req, res) => {
+    try {
+      const { sectionIds } = req.body;
+      
+      if (!Array.isArray(sectionIds)) {
+        return sendError(res, 400, "sectionIds must be an array");
+      }
+      
+      const success = await storage.reorderSections(sectionIds);
+      if (!success) {
+        return sendError(res, 500, "Failed to reorder sections");
+      }
+      
+      res.json({ message: "Sections reordered successfully" });
+    } catch (error) {
+      console.error("Reorder sections error:", error);
+      sendError(res, 500, "Failed to reorder sections");
     }
   });
 

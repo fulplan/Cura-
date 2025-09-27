@@ -113,6 +113,21 @@ export const settings = pgTable("settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Layout sections table for page layout management
+export const sections = pgTable("sections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  type: text("type").notNull(), // hero, text, image, video, etc.
+  content: json("content"), // Section configuration and content
+  status: text("status").notNull().default("active"), // active, draft, archived
+  order: integer("order").notNull().default(0), // Display order
+  pageId: text("page_id"), // Optional: associate with specific page
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  deletedAt: timestamp("deleted_at"), // Soft delete timestamp
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas for forms
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -165,6 +180,15 @@ export const insertSettingSchema = createInsertSchema(settings).pick({
   description: true,
 });
 
+export const insertSectionSchema = createInsertSchema(sections).pick({
+  title: true,
+  type: true,
+  content: true,
+  status: true,
+  order: true,
+  pageId: true,
+});
+
 // Type exports
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -185,3 +209,6 @@ export type Analytics = typeof analytics.$inferSelect;
 
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
 export type Setting = typeof settings.$inferSelect;
+
+export type InsertSection = z.infer<typeof insertSectionSchema>;
+export type Section = typeof sections.$inferSelect;

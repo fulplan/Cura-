@@ -3,6 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { LoadingCard } from "@/components/ui/loading";
+import { useToast } from "@/hooks/use-toast";
+import { usePostsWithDetails, useDeletePost } from "@/hooks/usePosts";
 import { 
   Search, 
   Filter, 
@@ -36,54 +39,30 @@ interface PostsListProps {
 export default function PostsList({ onCreatePost, onEditPost }: PostsListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const { toast } = useToast();
+  
+  // Use real API data
+  const { data: postsData, isLoading, error } = usePostsWithDetails();
+  const deletePostMutation = useDeletePost();
+  
+  const posts = postsData || [];
 
-  // TODO: Remove mock data
-  const posts = [
-    {
-      id: "1",
-      title: "Getting Started with React Development",
-      excerpt: "A comprehensive guide to building modern React applications...",
-      status: "published",
-      author: "John Doe",
-      category: "Tutorial",
-      publishDate: "2024-01-15",
-      views: 1247,
-      featured: true
-    },
-    {
-      id: "2", 
-      title: "Advanced TypeScript Patterns",
-      excerpt: "Exploring advanced TypeScript features and design patterns...",
-      status: "draft",
-      author: "Jane Smith",
-      category: "Programming",
-      publishDate: null,
-      views: 0,
-      featured: false
-    },
-    {
-      id: "3",
-      title: "Database Design Best Practices", 
-      excerpt: "Learn how to design scalable and efficient database schemas...",
-      status: "scheduled",
-      author: "Mike Johnson",
-      category: "Database",
-      publishDate: "2024-01-20",
-      views: 0,
-      featured: false
-    },
-    {
-      id: "4",
-      title: "Modern CSS Techniques",
-      excerpt: "CSS Grid, Flexbox, and modern layout techniques explained...",
-      status: "published",
-      author: "Sarah Wilson",
-      category: "CSS",
-      publishDate: "2024-01-10",
-      views: 856,
-      featured: true
+  // Handle delete post
+  const handleDeletePost = async (postId: string) => {
+    try {
+      await deletePostMutation.mutateAsync(postId);
+      toast({
+        title: "Post deleted",
+        description: "The post has been moved to trash.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete post. Please try again.",
+        variant: "destructive",
+      });
     }
-  ];
+  };
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -95,12 +74,60 @@ export default function PostsList({ onCreatePost, onEditPost }: PostsListProps) 
     return variants[status as keyof typeof variants] || variants.draft;
   };
 
-  const filteredPosts = posts.filter(post => {
-    const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         post.excerpt.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredPosts = posts.filter((post: any) => {
+    const matchesSearch = post.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         post.excerpt?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || post.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-semibold">Posts</h1>
+            <p className="text-muted-foreground text-sm md:text-base">Manage your content and articles</p>
+          </div>
+          <Button disabled size="sm" className="shrink-0">
+            <Plus className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">New Post</span>
+          </Button>
+        </div>
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <LoadingCard key={i} className="h-32" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-semibold">Posts</h1>
+            <p className="text-muted-foreground text-sm md:text-base">Manage your content and articles</p>
+          </div>
+          <Button onClick={onCreatePost} data-testid="button-create-post" size="sm" className="shrink-0">
+            <Plus className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">New Post</span>
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="text-center py-8">
+            <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">Failed to load posts</h3>
+            <p className="text-muted-foreground">Please try refreshing the page</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
@@ -150,16 +177,13 @@ export default function PostsList({ onCreatePost, onEditPost }: PostsListProps) 
 
       {/* Posts List */}
       <div className="space-y-4">
-        {filteredPosts.map((post) => (
+        {filteredPosts.map((post: any) => (
           <Card key={post.id} className="hover-elevate" data-testid={`post-card-${post.id}`}>
             <CardContent className="p-4 md:p-6">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="text-lg font-semibold">{post.title}</h3>
-                    {post.featured && (
-                      <Badge variant="outline" className="text-xs">Featured</Badge>
-                    )}
                     <Badge 
                       variant={getStatusBadge(post.status).variant}
                       className="text-xs capitalize"
@@ -169,26 +193,30 @@ export default function PostsList({ onCreatePost, onEditPost }: PostsListProps) 
                   </div>
                   
                   <p className="text-muted-foreground mb-3 line-clamp-2">
-                    {post.excerpt}
+                    {post.excerpt || "No excerpt available"}
                   </p>
                   
                   <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm text-muted-foreground flex-wrap">
-                    <span>By {post.author}</span>
-                    <span>•</span>
-                    <span>{post.category}</span>
-                    {post.publishDate && (
+                    <span>By {post.author?.displayName || post.author?.username || "Unknown"}</span>
+                    {post.category && (
+                      <>
+                        <span>•</span>
+                        <span>{post.category.name}</span>
+                      </>
+                    )}
+                    {post.publishedAt && (
                       <>
                         <span>•</span>
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          {new Date(post.publishDate).toLocaleDateString()}
+                          {new Date(post.publishedAt).toLocaleDateString()}
                         </span>
                       </>
                     )}
                     <span>•</span>
                     <span className="flex items-center gap-1">
                       <Eye className="w-3 h-3" />
-                      {post.views.toLocaleString()} views
+                      {(post.viewCount || 0).toLocaleString()} views
                     </span>
                   </div>
                 </div>
@@ -201,10 +229,7 @@ export default function PostsList({ onCreatePost, onEditPost }: PostsListProps) 
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem 
-                      onClick={() => {
-                        onEditPost?.(post.id);
-                        console.log(`Edit post: ${post.id}`);
-                      }}
+                      onClick={() => onEditPost?.(post.id)}
                       data-testid={`menu-edit-${post.id}`}
                     >
                       <Edit className="w-4 h-4 mr-2" />
@@ -214,7 +239,11 @@ export default function PostsList({ onCreatePost, onEditPost }: PostsListProps) 
                       <Eye className="w-4 h-4 mr-2" />
                       Preview
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive" data-testid={`menu-delete-${post.id}`}>
+                    <DropdownMenuItem 
+                      className="text-destructive" 
+                      onClick={() => handleDeletePost(post.id)}
+                      data-testid={`menu-delete-${post.id}`}
+                    >
                       <Trash2 className="w-4 h-4 mr-2" />
                       Delete
                     </DropdownMenuItem>
