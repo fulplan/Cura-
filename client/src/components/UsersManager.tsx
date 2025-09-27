@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Search,
   Plus,
@@ -13,7 +15,8 @@ import {
   MoreHorizontal,
   Shield,
   User,
-  Crown
+  Crown,
+  Loader2
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -28,6 +31,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useUsers, useDeleteUser } from "@/hooks/useUsers";
+import { useAuth } from "@/hooks/useAuth";
+import type { User as UserType } from "@shared/schema";
+import UserFormDialog from "./UserFormDialog";
 
 interface UsersManagerProps {
   onCreateUser?: () => void;
@@ -37,50 +54,46 @@ interface UsersManagerProps {
 export default function UsersManager({ onCreateUser, onEditUser }: UsersManagerProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [userFormOpen, setUserFormOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserType | null>(null);
+  const [formMode, setFormMode] = useState<"create" | "edit">("create");
+  
+  const { toast } = useToast();
+  const { user: currentUser } = useAuth();
+  const { data: users = [], isLoading, error } = useUsers();
+  const deleteUserMutation = useDeleteUser();
 
-  // TODO: Remove mock data
-  const users = [
-    {
-      id: "1",
-      name: "John Doe",
-      email: "john@example.com",
-      role: "admin",
-      status: "active",
-      lastActive: "2024-01-15",
-      postsCount: 45,
-      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face"
-    },
-    {
-      id: "2",
-      name: "Jane Smith",
-      email: "jane@example.com", 
-      role: "editor",
-      status: "active",
-      lastActive: "2024-01-14",
-      postsCount: 23,
-      avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face"
-    },
-    {
-      id: "3",
-      name: "Mike Johnson",
-      email: "mike@example.com",
-      role: "author",
-      status: "active", 
-      lastActive: "2024-01-10",
-      postsCount: 12,
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face"
-    },
-    {
-      id: "4",
-      name: "Sarah Wilson",
-      email: "sarah@example.com",
-      role: "editor",
-      status: "inactive",
-      lastActive: "2023-12-20", 
-      postsCount: 8,
-      avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face"
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      await deleteUserMutation.mutateAsync(userId);
+      toast({
+        title: "Success",
+        description: "User deleted successfully",
+      });
+      setDeleteUserId(null);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete user",
+        variant: "destructive",
+      });
     }
-  ];
+  };
+
+  const handleCreateUser = () => {
+    setFormMode("create");
+    setEditingUser(null);
+    setUserFormOpen(true);
+    onCreateUser?.();
+  };
+
+  const handleEditUser = (user: UserType) => {
+    setFormMode("edit");
+    setEditingUser(user);
+    setUserFormOpen(true);
+    onEditUser?.(user.id);
+  };
 
   const getRoleIcon = (role: string) => {
     switch (role) {
@@ -106,12 +119,86 @@ export default function UsersManager({ onCreateUser, onEditUser }: UsersManagerP
       : { variant: "secondary" as const, color: "bg-gray-500" };
   };
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredUsers = users.filter((user: UserType) => {
+    const displayName = user.displayName || user.username;
+    const matchesSearch = displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesRole = roleFilter === "all" || user.role === roleFilter;
     return matchesSearch && matchesRole;
   });
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-semibold">Users & Roles</h1>
+            <p className="text-muted-foreground text-sm md:text-base">Manage user accounts and permissions</p>
+          </div>
+          <Button disabled size="sm" className="shrink-0">
+            <Plus className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">New User</span>
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="p-3 md:p-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Skeleton className="h-10 flex-1" />
+              <Skeleton className="h-10 w-full sm:w-[140px]" />
+            </div>
+          </CardContent>
+        </Card>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-center gap-4">
+                  <Skeleton className="w-12 h-12 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-[200px]" />
+                    <Skeleton className="h-3 w-[150px]" />
+                    <Skeleton className="h-3 w-[250px]" />
+                  </div>
+                  <Skeleton className="w-8 h-8" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-semibold">Users & Roles</h1>
+            <p className="text-muted-foreground text-sm md:text-base">Manage user accounts and permissions</p>
+          </div>
+          <Button onClick={handleCreateUser} data-testid="button-create-user" size="sm" className="shrink-0">
+            <Plus className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">New User</span>
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="text-center py-8 md:py-12">
+            <User className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">Failed to load users</h3>
+            <p className="text-muted-foreground mb-4">
+              There was an error loading the user list. Please try again.
+            </p>
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
@@ -121,7 +208,7 @@ export default function UsersManager({ onCreateUser, onEditUser }: UsersManagerP
           <h1 className="text-2xl md:text-3xl font-semibold">Users & Roles</h1>
           <p className="text-muted-foreground text-sm md:text-base">Manage user accounts and permissions</p>
         </div>
-        <Button onClick={onCreateUser} data-testid="button-create-user" size="sm" className="shrink-0">
+        <Button onClick={handleCreateUser} data-testid="button-create-user" size="sm" className="shrink-0">
           <Plus className="w-4 h-4 sm:mr-2" />
           <span className="hidden sm:inline">New User</span>
         </Button>
@@ -159,9 +246,9 @@ export default function UsersManager({ onCreateUser, onEditUser }: UsersManagerP
 
       {/* Users List */}
       <div className="space-y-4">
-        {filteredUsers.map((user) => {
+        {filteredUsers.map((user: UserType) => {
           const RoleIcon = getRoleIcon(user.role);
-          const statusBadge = getStatusBadge(user.status);
+          const statusBadge = getStatusBadge("active");
           
           return (
             <Card key={user.id} className="hover-elevate" data-testid={`user-card-${user.id}`}>
@@ -169,24 +256,24 @@ export default function UsersManager({ onCreateUser, onEditUser }: UsersManagerP
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4 flex-1">
                     <Avatar className="w-12 h-12">
-                      <AvatarImage src={user.avatar} alt={user.name} />
+                      <AvatarImage src={user.avatar || undefined} alt={user.displayName || user.username} />
                       <AvatarFallback>
-                        {user.name.split(' ').map(n => n[0]).join('')}
+                        {(user.displayName || user.username).slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-1">
-                        <h3 className="font-semibold">{user.name}</h3>
+                        <h3 className="font-semibold">{user.displayName || user.username}</h3>
                         <Badge 
-                          variant={statusBadge.variant}
+                          variant="default"
                           className="text-xs capitalize"
                         >
-                          {user.status}
+                          active
                         </Badge>
                       </div>
                       
-                      <p className="text-sm text-muted-foreground mb-2">{user.email}</p>
+                      <p className="text-sm text-muted-foreground mb-2">{user.email || 'No email'}</p>
                       
                       <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm text-muted-foreground flex-wrap">
                         <div className="flex items-center gap-1">
@@ -194,9 +281,7 @@ export default function UsersManager({ onCreateUser, onEditUser }: UsersManagerP
                           <span className="capitalize">{user.role}</span>
                         </div>
                         <span>•</span>
-                        <span>{user.postsCount} posts</span>
-                        <span>•</span>
-                        <span>Active {new Date(user.lastActive).toLocaleDateString()}</span>
+                        <span>Member since {new Date(user.createdAt || Date.now()).toLocaleDateString()}</span>
                       </div>
                     </div>
                   </div>
@@ -209,25 +294,36 @@ export default function UsersManager({ onCreateUser, onEditUser }: UsersManagerP
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        onClick={() => {
-                          onEditUser?.(user.id);
-                          console.log(`Edit user: ${user.id}`);
-                        }}
+                        onClick={() => handleEditUser(user)}
                         data-testid={`menu-edit-${user.id}`}
                       >
                         <Edit className="w-4 h-4 mr-2" />
                         Edit User
                       </DropdownMenuItem>
-                      <DropdownMenuItem data-testid={`menu-permissions-${user.id}`}>
+                      <DropdownMenuItem 
+                        onClick={() => {
+                          toast({
+                            title: "Coming Soon",
+                            description: "User permissions management will be available soon",
+                          });
+                        }}
+                        data-testid={`menu-permissions-${user.id}`}
+                      >
                         <Shield className="w-4 h-4 mr-2" />
                         Permissions
                       </DropdownMenuItem>
-                      {user.role !== "admin" && (
+                      {user.role !== "admin" && currentUser?.id !== user.id && (
                         <DropdownMenuItem 
                           className="text-destructive"
+                          onClick={() => setDeleteUserId(user.id)}
+                          disabled={deleteUserMutation.isPending}
                           data-testid={`menu-delete-${user.id}`}
                         >
-                          <Trash2 className="w-4 h-4 mr-2" />
+                          {deleteUserMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4 mr-2" />
+                          )}
                           Delete User
                         </DropdownMenuItem>
                       )}
@@ -251,7 +347,7 @@ export default function UsersManager({ onCreateUser, onEditUser }: UsersManagerP
                 : "Create your first user account"}
             </p>
             {!searchQuery && roleFilter === "all" && (
-              <Button onClick={onCreateUser} data-testid="button-create-first-user">
+              <Button onClick={handleCreateUser} data-testid="button-create-first-user">
                 <Plus className="w-4 h-4 mr-2" />
                 Create User
               </Button>
@@ -259,6 +355,43 @@ export default function UsersManager({ onCreateUser, onEditUser }: UsersManagerP
           </CardContent>
         </Card>
       )}
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteUserId !== null} onOpenChange={() => setDeleteUserId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this user? This action cannot be undone and will permanently remove the user account and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteUserMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteUserId && handleDeleteUser(deleteUserId)}
+              disabled={deleteUserMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteUserMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete User"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* User Form Dialog */}
+      <UserFormDialog
+        open={userFormOpen}
+        onOpenChange={setUserFormOpen}
+        user={editingUser}
+        mode={formMode}
+      />
     </div>
   );
 }
