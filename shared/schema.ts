@@ -142,6 +142,7 @@ export const insertPostSchema = createInsertSchema(posts).pick({
   excerpt: true,
   featuredImage: true,
   status: true,
+  publishedAt: true,
   categoryId: true,
   meta: true,
 });

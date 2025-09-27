@@ -69,10 +69,14 @@ export class SchedulerService {
         config.cronExpression, 
         wrappedHandler, 
         {
-          scheduled: config.enabled !== false,
           timezone: config.timezone || 'UTC'
         }
       );
+
+      // Start task if enabled
+      if (config.enabled !== false) {
+        task.start();
+      }
 
       this.jobs.set(config.id, { task, config });
 
@@ -190,7 +194,8 @@ export class SchedulerService {
   getJobsStatus(): ScheduledJob[] {
     const jobs: ScheduledJob[] = [];
     
-    for (const [id, { config, task }] of this.jobs) {
+    for (const [id, jobData] of Array.from(this.jobs)) {
+      const { config, task } = jobData;
       jobs.push({
         id,
         name: config.name,
@@ -229,7 +234,8 @@ export class SchedulerService {
   shutdown(): void {
     console.log('🛑 Shutting down scheduler service...');
     
-    for (const [jobId, { task }] of this.jobs) {
+    for (const [jobId, jobData] of Array.from(this.jobs)) {
+      const { task } = jobData;
       try {
         task.stop();
         task.destroy();

@@ -103,10 +103,16 @@ export default function NewPostPage({
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '');
       
+      // Determine appropriate status - preserve scheduled posts
+      const now = new Date();
+      const publishDate = formData.publishDate ? new Date(formData.publishDate) : null;
+      const shouldBeScheduled = publishDate && publishDate > now;
+      
       let postData = {
         ...formData,
         slug,
-        status: "draft",
+        status: shouldBeScheduled ? "scheduled" : "draft",
+        publishedAt: shouldBeScheduled ? publishDate.toISOString() : undefined,
         categoryId: formData.category
       };
       
@@ -299,25 +305,7 @@ export default function NewPostPage({
 
   const handlePublish = async () => {
     try {
-      if (onPublish) {
-        // For edit mode, resolve tag names to IDs and map category
-        let publishData = { 
-          ...formData, 
-          status: "published",
-          categoryId: formData.category
-        };
-        delete (publishData as any).category;
-        
-        if (formData.tags && formData.tags.length > 0) {
-          const tagIds = await createTagsMutation.mutateAsync(formData.tags);
-          onPublish({ ...publishData, tags: tagIds });
-        } else {
-          onPublish(publishData);
-        }
-        return;
-      }
-      
-      // Validate required fields
+      // Validate required fields first
       if (!formData.title.trim()) {
         toast({
           title: "Validation Error",
@@ -335,22 +323,38 @@ export default function NewPostPage({
         });
         return;
       }
-      
+
       // Create slug from title if not provided
       const slug = formData.title.toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '');
+
+      // Determine if this is a scheduled post
+      const now = new Date();
+      const publishDate = formData.publishDate ? new Date(formData.publishDate) : null;
+      const isScheduled = publishDate && publishDate > now;
       
       let postData = {
         ...formData,
         slug,
-        status: "published",
-        publishedAt: new Date().toISOString(),
+        status: isScheduled ? "scheduled" : "published",
+        publishedAt: isScheduled ? publishDate.toISOString() : now.toISOString(),
         categoryId: formData.category // Map category to categoryId
       };
       
       // Remove the old category field
       delete (postData as any).category;
+
+      if (onPublish) {
+        // For edit mode, resolve tag names to IDs
+        if (formData.tags && formData.tags.length > 0) {
+          const tagIds = await createTagsMutation.mutateAsync(formData.tags);
+          onPublish({ ...postData, tags: tagIds });
+        } else {
+          onPublish(postData);
+        }
+        return;
+      }
       
       // Resolve tag names to IDs if tags exist
       if (formData.tags && formData.tags.length > 0) {
@@ -362,7 +366,9 @@ export default function NewPostPage({
       
       toast({
         title: "Success",
-        description: "Post published successfully!",
+        description: isScheduled 
+          ? `Post scheduled for ${publishDate?.toLocaleDateString()} at ${publishDate?.toLocaleTimeString()}!`
+          : "Post published successfully!",
       });
       
       setIsDirty(false);
@@ -491,16 +497,31 @@ export default function NewPostPage({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="publishDate">Publish Date</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="publishDate">Publish Date</Label>
+            {formData.publishDate && new Date(formData.publishDate) > new Date() && (
+              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800">
+                <Clock className="h-3 w-3 mr-1" />
+                Scheduled
+              </Badge>
+            )}
+          </div>
           <Input
             id="publishDate"
             type="datetime-local"
             value={formData.publishDate}
             onChange={(e) => updateField("publishDate", e.target.value)}
             data-testid="publish-date"
+            className={formData.publishDate && new Date(formData.publishDate) > new Date() 
+              ? "border-blue-300 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/50" 
+              : ""
+            }
           />
           <p className="text-xs text-muted-foreground">
-            Leave empty to publish immediately
+            {formData.publishDate && new Date(formData.publishDate) > new Date() 
+              ? `Post will be automatically published on ${new Date(formData.publishDate).toLocaleDateString()} at ${new Date(formData.publishDate).toLocaleTimeString()}`
+              : "Leave empty to publish immediately, or set a future date to schedule"
+            }
           </p>
         </div>
       </div>
@@ -657,7 +678,7 @@ export default function NewPostPage({
                   data-testid="publish-desktop"
                 >
                   <Globe className="h-4 w-4 mr-2" />
-                  {isLoading ? "Publishing..." : "Publish"}
+                  {isLoading ? "Publishing..." : (formData.publishDate && new Date(formData.publishDate) > new Date() ? "Schedule" : "Publish")}
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -666,7 +687,18 @@ export default function NewPostPage({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Schedule Post</DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => {
+                        setActiveTab("meta");
+                        setTimeout(() => {
+                          const publishDateInput = document.getElementById("publishDate");
+                          publishDateInput?.focus();
+                        }, 100);
+                      }}
+                    >
+                      <Clock className="h-4 w-4 mr-2" />
+                      Schedule Post
+                    </DropdownMenuItem>
                     <DropdownMenuItem>Save as Template</DropdownMenuItem>
                     <DropdownMenuItem className="text-destructive">Discard Changes</DropdownMenuItem>
                   </DropdownMenuContent>
