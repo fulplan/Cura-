@@ -856,12 +856,12 @@ export class PostgreSQLStorage implements IStorage {
         const mediaResults = await db.select({
           id: media.id,
           title: media.filename,
-          excerpt: media.altText,
+          excerpt: media.alt,
           createdAt: media.createdAt,
           type: sql<string>`'media'`.as('type'),
-          fileUrl: media.fileUrl,
-          fileType: media.fileType,
-          fileSize: media.fileSize
+          fileUrl: media.url,
+          fileType: media.mimeType,
+          fileSize: media.size
         })
         .from(media)
         .where(
@@ -869,7 +869,7 @@ export class PostgreSQLStorage implements IStorage {
             sql`${media.deletedAt} IS NULL`,
             or(
               sql`LOWER(${media.filename}) LIKE ${searchTerms}`,
-              sql`LOWER(${media.altText}) LIKE ${searchTerms}`
+              sql`LOWER(${media.alt}) LIKE ${searchTerms}`
             )
           )
         )
