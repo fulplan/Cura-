@@ -131,6 +131,19 @@ export const sections = pgTable("sections", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Post templates table for reusable post structures
+export const postTemplates = pgTable("post_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  template: json("template").notNull(), // Stores post structure (title, content, excerpt, category, tags, etc.)
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  isPublic: boolean("is_public").default(false), // Whether template can be used by other users
+  deletedAt: timestamp("deleted_at"), // Soft delete timestamp
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas for forms
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -198,6 +211,13 @@ export const insertSectionSchema = createInsertSchema(sections).pick({
   pageId: true,
 });
 
+export const insertPostTemplateSchema = createInsertSchema(postTemplates).pick({
+  name: true,
+  description: true,
+  template: true,
+  isPublic: true,
+});
+
 // Type exports
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -221,3 +241,6 @@ export type Setting = typeof settings.$inferSelect;
 
 export type InsertSection = z.infer<typeof insertSectionSchema>;
 export type Section = typeof sections.$inferSelect;
+
+export type InsertPostTemplate = z.infer<typeof insertPostTemplateSchema>;
+export type PostTemplate = typeof postTemplates.$inferSelect;

@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
-import { ArrowLeft, Save, Eye, MoreHorizontal, ImagePlus, Tag, Settings, Globe, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { ArrowLeft, Save, Eye, MoreHorizontal, ImagePlus, Tag, Settings, Globe, CheckCircle, Clock, AlertCircle, FileText, Trash2 } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
 import { useToast } from "@/hooks/use-toast";
 import { useCategories } from "@/hooks/useCategories";
 import { useCreateTagsFromNames } from "@/hooks/useTags";
+import { useCreatePostTemplate } from "@/hooks/usePostTemplates";
 import { insertPostSchema } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
@@ -52,8 +54,9 @@ export default function NewPostPage({
   const { toast } = useToast();
   const createPostMutation = useCreatePost();
   const createTagsMutation = useCreateTagsFromNames();
+  const createTemplateMutation = useCreatePostTemplate();
   const { data: categories = [] } = useCategories();
-  const isLoading = externalLoading || createPostMutation.isPending || createTagsMutation.isPending;
+  const isLoading = externalLoading || createPostMutation.isPending || createTagsMutation.isPending || createTemplateMutation.isPending;
   const [formData, setFormData] = useState(() => initialData || {
     title: "",
     content: "",
@@ -73,6 +76,11 @@ export default function NewPostPage({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [autoSavePostId, setAutoSavePostId] = useState<string | null>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Template dialog states
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateDescription, setTemplateDescription] = useState("");
 
   // Update form data when initialData changes (for edit mode)
   useEffect(() => {
@@ -389,6 +397,86 @@ export default function NewPostPage({
     onPreview(formData);
   }, [formData, onPreview]);
 
+  const handleSaveAsTemplate = useCallback(() => {
+    setShowTemplateDialog(true);
+  }, []);
+
+  const handleSaveTemplate = async () => {
+    if (!templateName.trim()) {
+      toast({
+        title: "Template Name Required",
+        description: "Please enter a name for your template",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await createTemplateMutation.mutateAsync({
+        name: templateName.trim(),
+        description: templateDescription.trim() || undefined,
+        content: formData.content,
+        settings: {
+          category: formData.category,
+          tags: formData.tags,
+          featured: formData.featured,
+          allowComments: formData.allowComments,
+          seoTitle: formData.seoTitle,
+          seoDescription: formData.seoDescription,
+        },
+      });
+
+      toast({
+        title: "Template Saved",
+        description: `Template "${templateName}" has been saved successfully!`,
+      });
+
+      // Reset template dialog state
+      setShowTemplateDialog(false);
+      setTemplateName("");
+      setTemplateDescription("");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save template. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDiscardChanges = useCallback(() => {
+    if (mode === 'create') {
+      // Reset form to initial state
+      setFormData({
+        title: "",
+        content: "",
+        excerpt: "",
+        category: "",
+        tags: [],
+        status: "draft",
+        featured: false,
+        allowComments: true,
+        seoTitle: "",
+        seoDescription: "",
+        publishDate: ""
+      });
+      setIsDirty(false);
+      
+      // Clear editor content
+      if (editorRef.current) {
+        editorRef.current.setContent("");
+      }
+
+      toast({
+        title: "Changes Discarded",
+        description: "All changes have been discarded and the form has been reset.",
+      });
+    } else {
+      // In edit mode, navigate away (like a cancel)
+      setLocation("/posts");
+    }
+  }, [mode, setLocation]);
+
   const ContentTab = useCallback(() => (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -699,8 +787,17 @@ export default function NewPostPage({
                       <Clock className="h-4 w-4 mr-2" />
                       Schedule Post
                     </DropdownMenuItem>
-                    <DropdownMenuItem>Save as Template</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive">Discard Changes</DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleSaveAsTemplate}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Save as Template
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      className="text-destructive" 
+                      onClick={handleDiscardChanges}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Discard Changes
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -815,6 +912,63 @@ export default function NewPostPage({
           postData={previewData}
         />
       )}
+
+      {/* Template Dialog */}
+      <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Save as Template</DialogTitle>
+            <DialogDescription>
+              Save the current post content and settings as a reusable template for future posts.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="template-name">Template Name *</Label>
+              <Input
+                id="template-name"
+                placeholder="Enter template name..."
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                data-testid="template-name-input"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="template-description">Description</Label>
+              <Textarea
+                id="template-description"
+                placeholder="Brief description of this template..."
+                value={templateDescription}
+                onChange={(e) => setTemplateDescription(e.target.value)}
+                className="h-20"
+                data-testid="template-description-input"
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional description to help identify this template later
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowTemplateDialog(false);
+                setTemplateName("");
+                setTemplateDescription("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveTemplate}
+              disabled={createTemplateMutation.isPending}
+              data-testid="save-template-button"
+            >
+              {createTemplateMutation.isPending ? "Saving..." : "Save Template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Page>
   );
 }

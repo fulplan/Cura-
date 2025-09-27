@@ -8,8 +8,10 @@ import {
   insertTagSchema,
   insertMediaSchema,
   insertSectionSchema,
+  insertPostTemplateSchema,
   postTags,
-  posts
+  posts,
+  postTemplates
 } from "@shared/schema";
 import { z } from "zod";
 import session from "express-session";
@@ -733,6 +735,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get post analytics error:", error);
       sendError(res, 500, "Failed to fetch post analytics");
+    }
+  });
+
+  // Post Templates Routes
+  app.get("/api/post-templates", requireAuth, async (req: any, res) => {
+    try {
+      const templates = await storage.listPostTemplates(req.session.user.id);
+      res.json(templates);
+    } catch (error) {
+      console.error("List post templates error:", error);
+      sendError(res, 500, "Failed to fetch post templates");
+    }
+  });
+
+  app.post("/api/post-templates", requireAuth, async (req: any, res) => {
+    try {
+      const templateData = validateBody(insertPostTemplateSchema, req.body);
+      const template = await storage.createPostTemplate({
+        ...templateData,
+        createdBy: req.session.user.id
+      });
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Create post template error:", error);
+      handleDbError(error, res, "Failed to create post template");
+    }
+  });
+
+  app.get("/api/post-templates/:id", requireAuth, async (req, res) => {
+    try {
+      const template = await storage.getPostTemplate(req.params.id);
+      if (!template) {
+        return sendError(res, 404, "Post template not found");
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Get post template error:", error);
+      sendError(res, 500, "Failed to fetch post template");
+    }
+  });
+
+  app.patch("/api/post-templates/:id", requireAuth, async (req: any, res) => {
+    try {
+      const templateData = validateBody(insertPostTemplateSchema.partial(), req.body);
+      const template = await storage.updatePostTemplate(req.params.id, templateData, req.session.user.id);
+      if (!template) {
+        return sendError(res, 404, "Post template not found");
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Update post template error:", error);
+      handleDbError(error, res, "Failed to update post template");
+    }
+  });
+
+  app.delete("/api/post-templates/:id", requireAuth, async (req: any, res) => {
+    try {
+      const deleted = await storage.deletePostTemplate(req.params.id, req.session.user.id);
+      if (!deleted) {
+        return sendError(res, 404, "Post template not found");
+      }
+      res.json({ message: "Post template deleted successfully" });
+    } catch (error) {
+      console.error("Delete post template error:", error);
+      sendError(res, 500, "Failed to delete post template");
     }
   });
 

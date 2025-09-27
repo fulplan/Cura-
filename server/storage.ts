@@ -7,7 +7,8 @@ import {
   type Analytics,
   type Setting, type InsertSetting,
   type Section, type InsertSection,
-  users, posts, categories, tags, media, analytics, postTags, settings, sections
+  type PostTemplate, type InsertPostTemplate,
+  users, posts, categories, tags, media, analytics, postTags, settings, sections, postTemplates
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, like, count, sql } from "drizzle-orm";
@@ -95,6 +96,13 @@ export interface IStorage {
   restoreSection(id: string): Promise<boolean>;
   listSections(pageId?: string, includeDeleted?: boolean): Promise<Section[]>;
   reorderSections(sectionIds: string[]): Promise<boolean>;
+  
+  // Post Templates
+  createPostTemplate(template: InsertPostTemplate): Promise<PostTemplate>;
+  getPostTemplate(id: string): Promise<PostTemplate | undefined>;
+  updatePostTemplate(id: string, template: Partial<InsertPostTemplate>, userId: string): Promise<PostTemplate | undefined>;
+  deletePostTemplate(id: string, userId: string): Promise<boolean>;
+  listPostTemplates(userId: string): Promise<PostTemplate[]>;
   
   // Email service initialization
   initializeEmailService(): Promise<void>;
@@ -912,6 +920,51 @@ export class PostgreSQLStorage implements IStorage {
       console.error('Search content error:', error);
       return { results: [], total: 0 };
     }
+  }
+
+  // Post Templates
+  async createPostTemplate(template: InsertPostTemplate): Promise<PostTemplate> {
+    const result = await db.insert(postTemplates).values(template).returning();
+    return result[0];
+  }
+
+  async getPostTemplate(id: string): Promise<PostTemplate | undefined> {
+    const result = await db.select().from(postTemplates)
+      .where(eq(postTemplates.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async updatePostTemplate(id: string, template: Partial<InsertPostTemplate>, userId: string): Promise<PostTemplate | undefined> {
+    // Check if user owns the template or is admin
+    const existing = await this.getPostTemplate(id);
+    if (!existing || (existing.createdBy !== userId)) {
+      return undefined;
+    }
+
+    const updateData = { ...template, updatedAt: new Date() };
+    const result = await db.update(postTemplates)
+      .set(updateData)
+      .where(eq(postTemplates.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deletePostTemplate(id: string, userId: string): Promise<boolean> {
+    // Check if user owns the template or is admin
+    const existing = await this.getPostTemplate(id);
+    if (!existing || (existing.createdBy !== userId)) {
+      return false;
+    }
+
+    const result = await db.delete(postTemplates).where(eq(postTemplates.id, id));
+    return result.length > 0;
+  }
+
+  async listPostTemplates(userId: string): Promise<PostTemplate[]> {
+    return db.select().from(postTemplates)
+      .where(eq(postTemplates.createdBy, userId))
+      .orderBy(desc(postTemplates.createdAt));
   }
 }
 
