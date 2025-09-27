@@ -20,18 +20,17 @@ import {
 } from "@/components/ui/page";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingGrid } from "@/components/ui/loading";
+import { useMedia, useDeleteMedia } from "@/hooks/useMedia";
+import { useToast } from "@/hooks/use-toast";
+import type { Media } from "@shared/schema";
 
-interface MediaFile {
-  id: string;
-  name: string;
+type MediaFile = Media & {
   type: "image" | "video" | "audio" | "document";
-  url: string;
-  size: number;
+  name: string;
   uploadDate: string;
   dimensions?: { width: number; height: number };
   duration?: number;
-  mimeType: string;
-}
+};
 
 interface MediaLibraryPageProps {
   onUpload?: () => void;
@@ -40,74 +39,43 @@ interface MediaLibraryPageProps {
   onDownload?: (ids: string[]) => void;
 }
 
-// Mock data
-const mockFiles: MediaFile[] = [
-  {
-    id: "1",
-    name: "hero-banner.jpg",
-    type: "image",
-    url: "/images/hero-banner.jpg",
-    size: 245760,
-    uploadDate: "2024-03-15",
-    dimensions: { width: 1920, height: 1080 },
-    mimeType: "image/jpeg"
-  },
-  {
-    id: "2", 
-    name: "product-demo.mp4",
-    type: "video",
-    url: "/videos/product-demo.mp4",
-    size: 15728640,
-    uploadDate: "2024-03-14",
-    dimensions: { width: 1280, height: 720 },
-    duration: 120,
-    mimeType: "video/mp4"
-  },
-  {
-    id: "3",
-    name: "user-guide.pdf",
-    type: "document",
-    url: "/documents/user-guide.pdf",
-    size: 1048576,
-    uploadDate: "2024-03-13",
-    mimeType: "application/pdf"
-  },
-  {
-    id: "4",
-    name: "logo-variants.png",
-    type: "image",
-    url: "/images/logo-variants.png",
-    size: 89600,
-    uploadDate: "2024-03-12",
-    dimensions: { width: 800, height: 600 },
-    mimeType: "image/png"
-  },
-  {
-    id: "5",
-    name: "background-music.mp3",
-    type: "audio",
-    url: "/audio/background-music.mp3",
-    size: 5242880,
-    uploadDate: "2024-03-11",
-    duration: 180,
-    mimeType: "audio/mpeg"
-  }
-];
 
 export default function MediaLibraryPage({ 
-  onUpload = () => console.log("Upload files"),
-  onSelect = (file) => console.log("Select file:", file),
-  onDelete = (ids) => console.log("Delete files:", ids),
-  onDownload = (ids) => console.log("Download files:", ids)
+  onUpload,
+  onSelect,
+  onDelete,
+  onDownload
 }: MediaLibraryPageProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  
+  const { toast } = useToast();
+  const { data: mediaData = [], isLoading, error } = useMedia();
+  const deleteMediaMutation = useDeleteMedia();
+
+  // Helper function to determine file type from MIME type
+  const getFileTypeFromMime = (mimeType: string): MediaFile["type"] => {
+    if (mimeType.startsWith("image/")) return "image";
+    if (mimeType.startsWith("video/")) return "video";
+    if (mimeType.startsWith("audio/")) return "audio";
+    return "document";
+  };
+
+  // Convert backend media data to frontend format
+  const mediaFiles: MediaFile[] = mediaData.map((media: Media) => ({
+    ...media,
+    type: getFileTypeFromMime(media.mimeType),
+    name: media.originalName,
+    uploadDate: media.createdAt || new Date().toISOString(),
+    // For now, these will be undefined - could be added later
+    dimensions: undefined,
+    duration: undefined
+  }));
 
   // Filter files based on search and filters
-  const filteredFiles = mockFiles.filter(file => {
+  const filteredFiles = mediaFiles.filter(file => {
     const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = typeFilter === "all" || file.type === typeFilter;
     return matchesSearch && matchesType;
@@ -127,6 +95,55 @@ export default function MediaLibraryPage({
     } else {
       setSelectedFiles([]);
     }
+  };
+
+  const handleDeleteFiles = async (fileIds: string[]) => {
+    try {
+      // Delete files one by one
+      for (const id of fileIds) {
+        await deleteMediaMutation.mutateAsync(id);
+      }
+      
+      toast({
+        title: "Success",
+        description: `${fileIds.length} file${fileIds.length === 1 ? '' : 's'} deleted successfully.`,
+      });
+      
+      // Clear selection
+      setSelectedFiles([]);
+      
+      // Call parent callback if provided
+      onDelete?.(fileIds);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete files. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadFiles = (fileIds: string[]) => {
+    // For each file ID, find the file and download it
+    fileIds.forEach(id => {
+      const file = mediaFiles.find(f => f.id === id);
+      if (file) {
+        // Create a temporary link and trigger download
+        const link = document.createElement('a');
+        link.href = file.url;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    });
+    
+    toast({
+      title: "Download Started",
+      description: `Starting download of ${fileIds.length} file${fileIds.length === 1 ? '' : 's'}.`,
+    });
+    
+    onDownload?.(fileIds);
   };
 
   const formatFileSize = (bytes: number) => {
@@ -181,16 +198,16 @@ export default function MediaLibraryPage({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onSelect(file)}>
+                <DropdownMenuItem onClick={() => onSelect?.(file)}>
                   <Eye className="h-4 w-4 mr-2" />
                   View
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onDownload([file.id])}>
+                <DropdownMenuItem onClick={() => handleDownloadFiles([file.id])}>
                   <Download className="h-4 w-4 mr-2" />
                   Download
                 </DropdownMenuItem>
                 <DropdownMenuItem 
-                  onClick={() => onDelete([file.id])}
+                  onClick={() => handleDeleteFiles([file.id])}
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -287,16 +304,16 @@ export default function MediaLibraryPage({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onSelect(file)}>
+            <DropdownMenuItem onClick={() => onSelect?.(file)}>
               <Eye className="h-4 w-4 mr-2" />
               View
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onDownload([file.id])}>
+            <DropdownMenuItem onClick={() => handleDownloadFiles([file.id])}>
               <Download className="h-4 w-4 mr-2" />
               Download
             </DropdownMenuItem>
             <DropdownMenuItem 
-              onClick={() => onDelete([file.id])}
+              onClick={() => handleDeleteFiles([file.id])}
               className="text-destructive focus:text-destructive"
             >
               <Trash2 className="h-4 w-4 mr-2" />
@@ -333,7 +350,7 @@ export default function MediaLibraryPage({
       <PageHeader>
         <div className="px-4 md:px-6">
           <PageToolbar>
-            <PageTitle badge="2.1k">
+            <PageTitle badge={mediaFiles.length.toString()}>
               Media Library
             </PageTitle>
             <PageActions>
@@ -354,7 +371,7 @@ export default function MediaLibraryPage({
                 >
                   <List className="h-4 w-4" />
                 </Button>
-                <Button onClick={onUpload} data-testid="upload-desktop">
+                <Button onClick={() => onUpload?.()} data-testid="upload-desktop">
                   <Upload className="h-4 w-4 mr-2" />
                   Upload
                 </Button>
@@ -416,7 +433,7 @@ export default function MediaLibraryPage({
               description="Upload images, videos, and documents to your media library."
               action={{
                 label: "Upload Files",
-                onClick: onUpload
+                onClick: () => onUpload?.()
               }}
             />
           )
@@ -430,11 +447,11 @@ export default function MediaLibraryPage({
                     {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected
                   </span>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => onDownload(selectedFiles)}>
+                    <Button variant="outline" size="sm" onClick={() => handleDownloadFiles(selectedFiles)}>
                       <Download className="h-4 w-4 mr-1" />
                       Download
                     </Button>
-                    <Button variant="outline" size="sm" className="text-destructive" onClick={() => onDelete(selectedFiles)}>
+                    <Button variant="outline" size="sm" className="text-destructive" onClick={() => handleDeleteFiles(selectedFiles)}>
                       <Trash2 className="h-4 w-4 mr-1" />
                       Delete
                     </Button>
@@ -463,7 +480,7 @@ export default function MediaLibraryPage({
 
       {/* Mobile FAB */}
       <FAB 
-        onClick={onUpload}
+        onClick={() => onUpload?.()}
         aria-label="Upload files"
         data-testid="upload-fab"
       >
@@ -476,10 +493,10 @@ export default function MediaLibraryPage({
           {selectedFiles.length} selected
         </span>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => onDownload(selectedFiles)}>
+          <Button variant="outline" size="sm" onClick={() => handleDownloadFiles(selectedFiles)}>
             <Download className="h-4 w-4" />
           </Button>
-          <Button variant="destructive" size="sm" onClick={() => onDelete(selectedFiles)}>
+          <Button variant="destructive" size="sm" onClick={() => handleDeleteFiles(selectedFiles)}>
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
