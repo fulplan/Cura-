@@ -304,7 +304,11 @@ export default function LayoutManager({ onAddSection, onEditSection }: LayoutMan
                               {section.status}
                             </span>
                           </div>
-                          <p className="text-sm text-muted-foreground">{section.content}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {typeof section.content === 'object' && section.content?.description 
+                              ? section.content.description 
+                              : section.content || 'No description'}
+                          </p>
                         </div>
                       </div>
 

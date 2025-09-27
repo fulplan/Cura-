@@ -60,13 +60,41 @@ function AuthenticatedRouter() {
       {/* Dashboard Routes */}
       <Route path="/">
         <AdminLayout currentPage={getCurrentPage()}>
-          <Dashboard onQuickAction={(action) => console.log("Quick action:", action)} />
+          <Dashboard onQuickAction={(action) => {
+            switch (action) {
+              case "new-post":
+                setLocation("/posts/new");
+                break;
+              case "upload":
+                setLocation("/media/upload");
+                break;
+              case "schedule":
+                setLocation("/schedule");
+                break;
+              default:
+                console.log("Unknown quick action:", action);
+            }
+          }} />
         </AdminLayout>
       </Route>
       
       <Route path="/dashboard">
         <AdminLayout currentPage={getCurrentPage()}>
-          <Dashboard onQuickAction={(action) => console.log("Quick action:", action)} />
+          <Dashboard onQuickAction={(action) => {
+            switch (action) {
+              case "new-post":
+                setLocation("/posts/new");
+                break;
+              case "upload":
+                setLocation("/media/upload");
+                break;
+              case "schedule":
+                setLocation("/schedule");
+                break;
+              default:
+                console.log("Unknown quick action:", action);
+            }
+          }} />
         </AdminLayout>
       </Route>
       

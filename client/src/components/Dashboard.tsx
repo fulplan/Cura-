@@ -36,7 +36,7 @@ export default function Dashboard({ onQuickAction }: DashboardProps) {
   ];
 
   // Transform recent posts data for display
-  const recentPosts = recentPostsData.slice(0, 4).map((post: any) => ({
+  const recentPosts = recentPostsData.slice(0, 4).map((post: any, index: number) => ({
     title: post.title,
     status: post.status,
     date: formatRelativeDate(post.createdAt),

@@ -112,8 +112,8 @@ export default function NewPostPage({
         ...formData,
         slug,
         status: shouldBeScheduled ? "scheduled" : "draft",
-        publishedAt: shouldBeScheduled ? publishDate.toISOString() : undefined,
-        categoryId: formData.category
+        publishedAt: shouldBeScheduled ? publishDate : undefined,
+        categoryId: formData.category || null
       };
       
       // Remove the old category field
@@ -272,7 +272,7 @@ export default function NewPostPage({
         ...formData,
         slug,
         status: "draft",
-        categoryId: formData.category // Map category to categoryId
+        categoryId: formData.category || null // Map category to categoryId
       };
       
       // Remove the old category field
@@ -338,8 +338,8 @@ export default function NewPostPage({
         ...formData,
         slug,
         status: isScheduled ? "scheduled" : "published",
-        publishedAt: isScheduled ? publishDate.toISOString() : now.toISOString(),
-        categoryId: formData.category // Map category to categoryId
+        publishedAt: isScheduled ? publishDate : now,
+        categoryId: formData.category || null // Map category to categoryId
       };
       
       // Remove the old category field

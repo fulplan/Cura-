@@ -11,7 +11,9 @@ export function useMedia(limit = 50, offset = 0) {
       if (!response.ok) {
         throw new Error('Failed to fetch media');
       }
-      return response.json();
+      const result = await response.json();
+      // Extract the media array from the API response
+      return result.media || [];
     },
     enabled: true,
     staleTime: 60000, // 1 minute

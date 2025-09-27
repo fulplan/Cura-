@@ -163,6 +163,12 @@ export const insertPostSchema = createInsertSchema(posts).pick({
   publishedAt: true,
   categoryId: true,
   meta: true,
+}).extend({
+  // Transform publishedAt string to Date object for JSON requests
+  publishedAt: z.union([
+    z.date(),
+    z.string().transform((str) => str ? new Date(str) : undefined)
+  ]).optional()
 });
 
 export const insertMediaSchema = createInsertSchema(media).pick({
