@@ -17,6 +17,9 @@ import {
   FilterSheet
 } from "@/components/ui/page";
 import { EmptyStates } from "@/components/ui/empty-state";
+import { useDeletedPosts, useRestorePost, usePermanentDeletePost, useBulkRestorePosts, useBulkPermanentDelete, useEmptyTrash } from "@/hooks/useTrash";
+import { useToast } from "@/hooks/use-toast";
+import { LoadingCard } from "@/components/ui/loading";
 
 interface TrashedItem {
   id: string;
@@ -34,61 +37,36 @@ interface TrashPageProps {
   onEmptyTrash?: () => void;
 }
 
-// Mock data
-const mockTrashedItems: TrashedItem[] = [
-  {
-    id: "1",
-    name: "Old Blog Post About React",
-    type: "post",
-    deletedDate: "2024-03-15",
-    deletedBy: "John Doe",
-    originalLocation: "/posts"
-  },
-  {
-    id: "2",
-    name: "unused-banner.jpg",
-    type: "media",
-    deletedDate: "2024-03-14",
-    deletedBy: "Jane Smith",
-    originalLocation: "/media/images",
-    size: 245760
-  },
-  {
-    id: "3",
-    name: "Privacy Policy Draft",
-    type: "page",
-    deletedDate: "2024-03-13",
-    deletedBy: "Admin",
-    originalLocation: "/pages"
-  },
-  {
-    id: "4",
-    name: "Legacy Category",
-    type: "category",
-    deletedDate: "2024-03-12",
-    deletedBy: "Editor",
-    originalLocation: "/categories"
-  },
-  {
-    id: "5",
-    name: "Former Employee",
-    type: "user",
-    deletedDate: "2024-03-10",
-    deletedBy: "HR Manager",
-    originalLocation: "/users"
-  }
-];
-
 export default function TrashPage({ 
-  onRestore = (ids) => console.log("Restore items:", ids),
-  onPermanentDelete = (ids) => console.log("Permanently delete:", ids),
-  onEmptyTrash = () => console.log("Empty trash")
-}: TrashPageProps) {
+  onRestore,
+  onPermanentDelete,
+  onEmptyTrash
+}: TrashPageProps = {}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
-  const filteredItems = mockTrashedItems.filter(item => {
+  const { toast } = useToast();
+  
+  // Fetch deleted posts
+  const { data: deletedPostsData, isLoading: isLoadingPosts } = useDeletedPosts();
+  const restorePostMutation = useRestorePost();
+  const permanentDeleteMutation = usePermanentDeletePost();
+  const bulkRestoreMutation = useBulkRestorePosts();
+  const bulkDeleteMutation = useBulkPermanentDelete();
+  const emptyTrashMutation = useEmptyTrash();
+
+  // Convert deleted posts to TrashedItem format
+  const trashedItems: TrashedItem[] = (deletedPostsData?.posts || []).map((post: any) => ({
+    id: post.id,
+    name: post.title,
+    type: "post" as const,
+    deletedDate: post.deletedAt ? new Date(post.deletedAt).toISOString().split('T')[0] : "",
+    deletedBy: "Unknown", // Could be enhanced to track who deleted
+    originalLocation: "/posts"
+  }));
+
+  const filteredItems = trashedItems.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          item.deletedBy.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = typeFilter === "all" || item.type === typeFilter;
@@ -108,6 +86,76 @@ export default function TrashPage({
       setSelectedItems(filteredItems.map(item => item.id));
     } else {
       setSelectedItems([]);
+    }
+  };
+
+  const handleRestore = async (ids: string[]) => {
+    try {
+      if (ids.length === 1) {
+        await restorePostMutation.mutateAsync(ids[0]);
+        toast({
+          title: "Success",
+          description: "Item restored successfully.",
+        });
+      } else {
+        await bulkRestoreMutation.mutateAsync(ids);
+        toast({
+          title: "Success", 
+          description: `${ids.length} items restored successfully.`,
+        });
+      }
+      setSelectedItems([]);
+      onRestore?.(ids);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to restore items. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePermanentDelete = async (ids: string[]) => {
+    try {
+      if (ids.length === 1) {
+        await permanentDeleteMutation.mutateAsync(ids[0]);
+        toast({
+          title: "Success",
+          description: "Item permanently deleted.",
+        });
+      } else {
+        await bulkDeleteMutation.mutateAsync(ids);
+        toast({
+          title: "Success",
+          description: `${ids.length} items permanently deleted.`,
+        });
+      }
+      setSelectedItems([]);
+      onPermanentDelete?.(ids);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete items. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEmptyTrash = async () => {
+    try {
+      await emptyTrashMutation.mutateAsync();
+      toast({
+        title: "Success",
+        description: "Trash emptied successfully.",
+      });
+      setSelectedItems([]);
+      onEmptyTrash?.();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to empty trash. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -189,12 +237,12 @@ export default function TrashPage({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onRestore([item.id])}>
+                  <DropdownMenuItem onClick={() => handleRestore([item.id])}>
                     <RotateCcw className="h-4 w-4 mr-2" />
                     Restore
                   </DropdownMenuItem>
                   <DropdownMenuItem 
-                    onClick={() => onPermanentDelete([item.id])}
+                    onClick={() => handlePermanentDelete([item.id])}
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
@@ -248,10 +296,10 @@ export default function TrashPage({
               Trash & Archived
             </PageTitle>
             <div className="hidden md:flex items-center gap-2">
-              {mockTrashedItems.length > 0 && (
+              {trashedItems.length > 0 && (
                 <Button 
                   variant="destructive" 
-                  onClick={onEmptyTrash}
+                  onClick={handleEmptyTrash}
                   data-testid="empty-trash-desktop"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -299,7 +347,13 @@ export default function TrashPage({
       </PageHeader>
 
       <PageBody className="px-4 md:px-6">
-        {filteredItems.length === 0 ? (
+        {isLoadingPosts ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <LoadingCard key={i} />
+            ))}
+          </div>
+        ) : filteredItems.length === 0 ? (
           searchQuery || typeFilter !== "all" ? (
             <div className="text-center py-12">
               <h3 className="text-lg font-semibold mb-2">No items found</h3>
@@ -333,7 +387,7 @@ export default function TrashPage({
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => onRestore(selectedItems)}
+                    onClick={() => handleRestore(selectedItems)}
                     data-testid="restore-selected"
                   >
                     <RotateCcw className="h-4 w-4 mr-2" />
@@ -342,7 +396,7 @@ export default function TrashPage({
                   <Button 
                     variant="destructive" 
                     size="sm" 
-                    onClick={() => onPermanentDelete(selectedItems)}
+                    onClick={() => handlePermanentDelete(selectedItems)}
                     data-testid="delete-selected"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
@@ -368,11 +422,11 @@ export default function TrashPage({
           {selectedItems.length} selected
         </span>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => onRestore(selectedItems)}>
+          <Button variant="outline" size="sm" onClick={() => handleRestore(selectedItems)}>
             <RotateCcw className="h-4 w-4 mr-1" />
             Restore
           </Button>
-          <Button variant="destructive" size="sm" onClick={() => onPermanentDelete(selectedItems)}>
+          <Button variant="destructive" size="sm" onClick={() => handlePermanentDelete(selectedItems)}>
             <Trash2 className="h-4 w-4 mr-1" />
             Delete
           </Button>

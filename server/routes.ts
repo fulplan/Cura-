@@ -7,12 +7,15 @@ import {
   insertCategorySchema,
   insertTagSchema,
   insertMediaSchema,
-  insertSectionSchema
+  insertSectionSchema,
+  postTags,
+  posts
 } from "@shared/schema";
 import { z } from "zod";
 import session from "express-session";
 import MemoryStore from "memorystore";
 import { db } from "./db";
+import { eq } from "drizzle-orm";
 import multer from "multer";
 import { join } from "path";
 import { mkdirSync, existsSync } from "fs";
@@ -645,6 +648,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Delete post error:", error);
       sendError(res, 500, "Failed to move post to trash");
+    }
+  });
+
+  // Trash Routes - List deleted posts
+  app.get("/api/trash/posts", requireAuth, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const result = await storage.listDeletedPosts(limit, offset);
+      res.json(result);
+    } catch (error) {
+      console.error("List deleted posts error:", error);
+      sendError(res, 500, "Failed to fetch deleted posts");
+    }
+  });
+
+  // Restore post from trash
+  app.post("/api/trash/posts/:id/restore", requireAuth, async (req, res) => {
+    try {
+      const restored = await storage.restorePost(req.params.id);
+      if (!restored) {
+        return sendError(res, 404, "Post not found in trash");
+      }
+      res.json({ message: "Post restored successfully" });
+    } catch (error) {
+      console.error("Restore post error:", error);
+      sendError(res, 500, "Failed to restore post");
+    }
+  });
+
+  // Permanently delete post
+  app.delete("/api/posts/:id/permanent", requireAdmin, async (req, res) => {
+    try {
+      // First delete from post_tags junction table
+      await db.delete(postTags).where(eq(postTags.postId, req.params.id));
+      
+      // Then permanently delete the post
+      const result = await db.delete(posts).where(eq(posts.id, req.params.id));
+      if (result.length === 0) {
+        return sendError(res, 404, "Post not found");
+      }
+      res.json({ message: "Post permanently deleted" });
+    } catch (error) {
+      console.error("Permanent delete post error:", error);
+      sendError(res, 500, "Failed to permanently delete post");
     }
   });
 
