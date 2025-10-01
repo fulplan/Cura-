@@ -1,1 +1,2 @@
 Test
+Ghana/Password /etc/passwd
